@@ -1,0 +1,237 @@
+openapi: 3.0.0
+info:
+  title: API REST de Kuali CRM
+  version: 1.0.0
+  description: >
+    Servicio REST para gestionar Companies y Leads con
+    Node.js + Express y Prisma sobre PostgreSQL (Neon).
+servers:
+  - url: http://localhost:3000
+    description: Servidor local de desarrollo
+
+paths:
+  /companies:
+    get:
+      summary: Listar todas las compañías
+      responses:
+        '200':
+          description: Array de compañías
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Company'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Crear una nueva compañía
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCompanyInput'
+      responses:
+        '201':
+          description: Compañía creada correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Company'
+        '400':
+          description: Solicitud inválida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /leads:
+    get:
+      summary: Listar todos los leads con su compañía asociada
+      responses:
+        '200':
+          description: Array de leads
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LeadWithCompany'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Crear un nuevo lead
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLeadInput'
+      responses:
+        '201':
+          description: Lead creado correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+        '400':
+          description: Solicitud inválida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    Company:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: UUID de la compañía
+        name:
+          type: string
+          description: Nombre de la empresa
+        sector:
+          type: string
+          nullable: true
+          description: Sector de actividad
+        createdAt:
+          type: string
+          format: date-time
+          description: Fecha de creación
+        updatedAt:
+          type: string
+          format: date-time
+          description: Fecha de última actualización
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Soft-delete (opcional)
+      required:
+        - id
+        - name
+        - createdAt
+        - updatedAt
+
+    CreateCompanyInput:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Nombre de la nueva empresa
+        sector:
+          type: string
+          description: Sector de actividad
+      required:
+        - name
+
+    Lead:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        phoneNumber:
+          type: string
+          nullable: true
+        linkedinUrl:
+          type: string
+          format: uri
+          nullable: true
+        role:
+          type: string
+          nullable: true
+        seniority:
+          type: string
+          nullable: true
+        companyId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - id
+        - firstName
+        - lastName
+        - email
+        - companyId
+        - createdAt
+        - updatedAt
+
+    LeadWithCompany:
+      allOf:
+        - $ref: '#/components/schemas/Lead'
+        - type: object
+          properties:
+            company:
+              $ref: '#/components/schemas/Company'
+
+    CreateLeadInput:
+      type: object
+      properties:
+        firstName:
+          type: string
+          description: Nombre del lead
+        lastName:
+          type: string
+          description: Apellido del lead
+        email:
+          type: string
+          format: email
+        phoneNumber:
+          type: string
+          nullable: true
+        linkedinUrl:
+          type: string
+          format: uri
+          nullable: true
+        role:
+          type: string
+          nullable: true
+        seniority:
+          type: string
+          nullable: true
+        companyId:
+          type: string
+          format: uuid
+          description: UUID de la company asociada
+      required:
+        - firstName
+        - lastName
+        - email
+        - companyId
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error 
