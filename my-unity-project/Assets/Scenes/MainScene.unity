@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Scene>
+  <GameObjects>
+    <GameObject name="Cube" tag="Untagged">
+      <Transform>
+        <Position x="0" y="0" z="0" />
+        <Rotation x="0" y="0" z="0" w="1" />
+        <Scale x="1" y="1" z="1" />
+      </Transform>
+      <Components>
+        <Component type="Vuforia.ImageTargetBehaviour">
+          <ImageTarget>
+            <Name>CubeMarker</Name>
+          </ImageTarget>
+        </Component>
+        <Component type="Photon.Pun.PhotonView">
+          <ViewID>1</ViewID>
+        </Component>
+        <Component type="CubeController" />
+      </Components>
+    </GameObject>
+  </GameObjects>
+  <Vuforia>
+    <Database>
+      <Name>CubeDatabase</Name>
+    </Database>
+  </Vuforia>
+</Scene>

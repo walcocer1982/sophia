@@ -1,0 +1,17 @@
+{
+  "name": "my-fullstack-app-frontend",
+  "version": "1.0.0",
+  "description": "Frontend for the Fullstack App that interacts with the DNI API.",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "live-server src",
+    "build": "echo 'Build step not defined yet.'"
+  },
+  "dependencies": {
+    "axios": "^0.21.1",
+    "cors": "^2.8.5"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

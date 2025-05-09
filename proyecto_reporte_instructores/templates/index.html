@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplicación de Análisis de Encuestas de Satisfacción</title>
+</head>
+<body>
+    <h1>Aplicación de Análisis de Encuestas de Satisfacción</h1>
+    <form action="/upload" method="post" enctype="multipart/form-data">
+        <label for="file">Cargar archivo de Excel:</label>
+        <input type="file" id="file" name="file" accept=".xlsx, .xls">
+        <button type="submit">Subir</button>
+    </form>
+    <br>
+    {% if show_buttons %}
+        <button onclick="location.href='/report_instructor'">Ver Reporte del Instructor</button>
+        <button onclick="location.href='/report_servicio'">Ver Reporte del Servicio</button>
+    {% endif %}
+</body>
+</html>

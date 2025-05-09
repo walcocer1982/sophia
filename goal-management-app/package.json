@@ -1,0 +1,24 @@
+{
+  "name": "goal-management-app",
+  "version": "1.0.0",
+  "description": "A personal goal, task, and routine management application.",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "mongoose": "^5.10.9",
+    "dotenv": "^8.2.0"
+  },
+  "devDependencies": {
+    "jest": "^26.6.0"
+  },
+  "author": "Your Name",
+  "license": "MIT"
+}
+```
+
+MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/goal-management-app?retryWrites=true&w=majority
+PORT=3000
