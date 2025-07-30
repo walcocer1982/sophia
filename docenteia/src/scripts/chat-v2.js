@@ -17,7 +17,7 @@ const colors = {
 };
 
 // Estado global de la conversación
-let conversationState = {
+const conversationState = {
   currentCourse: null,
   currentSession: null,
   isInClass: false,
@@ -89,23 +89,7 @@ async function queryOpenAI(query, sessionId, courseId) {
   }
 }
 
-// Función para consultar contenido específico de la sesión
-async function querySessionContent(query, sessionId, courseId) {
-  try {
-    const response = await axios.post(`http://localhost:${conversationState.serverPort}/api/openai-vector`, {
-      query,
-      sessionId,
-      courseId
-    }, {
-      timeout: 30000
-    });
-    
-    return response.data.response;
-  } catch (error) {
-    print('red', `❌ Error consultando contenido de sesión: ${error.message}`);
-    return null;
-  }
-}
+
 
 // Función para mostrar cursos disponibles
 function showCourses() {
