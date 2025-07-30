@@ -1,12 +1,19 @@
 # DocenteIA - Sistema Estable con Next.js y TypeScript
 
-Un sistema robusto y estable construido con Next.js 15, TypeScript estricto y Tailwind CSS.
+Un sistema robusto y estable construido con Next.js 14, TypeScript estricto y Tailwind CSS.
+
+## 🎯 Propósito
+
+DocenteIA es un asistente de enseñanza inteligente que utiliza OpenAI para crear experiencias de aprendizaje personalizadas y conversacionales. El sistema permite a los docentes crear sesiones interactivas con contenido específico y guías de enseñanza estructuradas.
 
 ## 🚀 Características
 
-- **Next.js 15**: La versión más reciente con App Router
+- **Next.js 14**: Versión estable con App Router
 - **TypeScript Estricto**: Configuración robusta con verificaciones exhaustivas
-- **Tailwind CSS 4**: Estilos modernos y optimizados
+- **Tailwind CSS 3**: Estilos modernos y optimizados
+- **OpenAI Integration**: Chat conversacional inteligente
+- **Teaching Guide System**: Estructura de momentos pedagógicos
+- **Course Database**: Gestión de cursos y sesiones
 - **ESLint Configurado**: Reglas estrictas para código limpio
 - **Componentes Reutilizables**: Sistema de componentes con TypeScript
 - **Utilidades Optimizadas**: Funciones helper para desarrollo eficiente
