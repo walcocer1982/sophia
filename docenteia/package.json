@@ -1,0 +1,37 @@
+{
+  "name": "docenteia",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "chat": "node src/scripts/terminal-chat.js"
+  },
+  "dependencies": {
+    "@openai/agents": "^0.0.13",
+    "autoprefixer": "^10.4.21",
+    "axios": "^1.11.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "dotenv": "^17.2.1",
+    "lucide-react": "^0.532.0",
+    "next": "^14.2.0",
+    "openai": "^5.10.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^3.3.1",
+    "tailwindcss": "^3.4.17"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@types/node": "^20.19.9",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "eslint": "^9",
+    "eslint-config-next": "15.4.4",
+    "flatrepo": "^1.2.0",
+    "typescript": "^5"
+  }
+}

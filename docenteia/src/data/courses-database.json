@@ -1,0 +1,110 @@
+{
+  "courses": [
+    {
+      "id": "SSO001",
+      "name": "Seguridad y Salud Ocupacional",
+      "description": "Curso completo de SSO con múltiples sesiones de capacitación",
+      "specialist_role": "Especialista en Seguridad y Salud Ocupacional",
+      "sessions": [
+        {
+          "id": "sesion01",
+          "name": "IPERC - Identificación de Peligros, Evaluación de Riesgos y Controles",
+          "file_id": "file-LtVxVon3svgvNrafJLhbXS",
+          "file_name": "contenido_sso_sesion01_MSEII.md",
+          "learning_objective": "El estudiante identifica peligros en una situación laboral, evalúa los riesgos asociados y propone controles adecuados para prevenir accidentes",
+          "key_points": [
+            "Comprende qué es un peligro y cómo se reconoce en el ambiente laboral",
+            "Diferencia entre peligro y riesgo en el contexto de SSO",
+            "Relaciona la severidad y probabilidad para evaluar un riesgo",
+            "Propone controles adecuados según el tipo de peligro identificado"
+          ]
+        },
+        {
+          "id": "sesion02", 
+          "name": "Sesión 02 de SSO",
+          "file_id": "file-MLGFPC2nruo5t5jjC9En1a",
+          "file_name": "contenido_sso_sesion02_MSEII.json",
+          "learning_objective": "El estudiante aplica procedimientos de seguridad en situaciones específicas del trabajo",
+          "key_points": [
+            "Identifica procedimientos de seguridad relevantes",
+            "Aplica medidas de protección personal",
+            "Reconoce señales y señalización de seguridad",
+            "Implementa protocolos de emergencia"
+          ]
+        },
+        {
+          "id": "sesion03",
+          "name": "Prevención de Incendios en el Trabajo", 
+          "file_id": "file-MPwrLaMwDkie5yQrymSRqo",
+          "file_name": "contenido_sso_sesion03_MSEII.json",
+          "learning_objective": "El estudiante identifica causas de incendios y aplica medidas preventivas y de respuesta",
+          "key_points": [
+            "Reconoce las causas principales de incendios en el trabajo",
+            "Identifica medidas preventivas para evitar incendios",
+            "Aplica procedimientos de evacuación en caso de emergencia",
+            "Utiliza correctamente equipos contra incendios"
+          ]
+        }
+      ],
+      "metadata": {
+        "total_sessions": 3,
+        "total_files": 3,
+        "created_at": "2025-07-28",
+        "last_updated": "2025-07-28"
+      }
+    },
+    {
+      "id": "PER001",
+      "name": "Operación de Equipos de Perforación",
+      "description": "Curso completo de perforación con múltiples sesiones de capacitación",
+      "specialist_role": "Especialista en operación de equipos de perforación",
+      "sessions": [
+        {
+          "id": "sesion01",
+          "name": "Fundamentos de Perforación",
+          "file_id": "file-LtVxVon3svgvNrafJLhbXS",
+          "file_name": "contenido_perforacion_sesion01.md",
+          "learning_objective": "El estudiante identifica los componentes principales de un equipo de perforación y explica su función en el proceso",
+          "key_points": [
+            "Comprende qué es un equipo de perforación y sus aplicaciones",
+            "Identifica los componentes principales del equipo de perforación",
+            "Explica la función de cada componente en el proceso",
+            "Relaciona el funcionamiento de los componentes para lograr la perforación efectiva"
+          ]
+        },
+        {
+          "id": "sesion02",
+          "name": "Técnicas de Perforación",
+          "file_id": "file-MLGFPC2nruo5t5jjC9En1a",
+          "file_name": "contenido_perforacion_sesion02.md",
+          "learning_objective": "El estudiante aplica técnicas de perforación según el tipo de terreno y objetivo",
+          "key_points": [
+            "Reconoce diferentes tipos de técnicas de perforación",
+            "Selecciona la técnica apropiada según el terreno",
+            "Aplica procedimientos de seguridad en perforación",
+            "Evalúa la eficiencia de la técnica utilizada"
+          ]
+        },
+        {
+          "id": "sesion03",
+          "name": "Mantenimiento de Equipos de Perforación",
+          "file_id": "file-MPwrLaMwDkie5yQrymSRqo",
+          "file_name": "contenido_perforacion_sesion03.md",
+          "learning_objective": "El estudiante realiza mantenimiento preventivo y correctivo en equipos de perforación",
+          "key_points": [
+            "Identifica componentes que requieren mantenimiento regular",
+            "Aplica procedimientos de mantenimiento preventivo",
+            "Diagnostica problemas comunes en equipos de perforación",
+            "Ejecuta mantenimiento correctivo básico"
+          ]
+        }
+      ],
+      "metadata": {
+        "total_sessions": 3,
+        "total_files": 3,
+        "created_at": "2025-07-28",
+        "last_updated": "2025-07-28"
+      }
+    }
+  ]
+} 
