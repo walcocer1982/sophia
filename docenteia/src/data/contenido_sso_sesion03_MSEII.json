@@ -1,0 +1,176 @@
+{
+  "metadata": {
+    "titulo": "Guía IA - Docente Uno a Uno",
+    "tema": "Prevención de Incendios en el Trabajo",
+    "duracion_estimada": "90 minutos",
+    "carrera": "MSEII",
+    "palabras_clave_generales": ["prevencion_incendios", "seguridad", "salud_ocupacional", "triangulo_fuego", "extintores", "rutas_evacuacion", "capacitacion", "docente_ia"]
+  },
+  "momentos": [
+    {
+      "momento": "MOMENTO_0",
+      "titulo": "SALUDO Y ENCENDIDO DEL AULA",
+      "palabras_clave": ["saludo", "bienvenida", "clima_confianza", "presentacion", "conexion_inicial"],
+      "objetivo": "Establecer conexión inicial y clima de confianza",
+      "duracion": "5 minutos",
+      "accion_docente_ia": "Saluda con calidez al estudiante, nómbralo, genera un clima de confianza",
+      "frase_modelo": "Hola [nombre], bienvenido. ¿Cómo estás hoy? ¿Te gustaría compartir una palabra que describa cómo te sientes?",
+      "presentacion_sesion": "Hoy vas a aprender algo fundamental para tu seguridad y la de tus compañeros: la prevención de incendios. Es un conocimiento que puede salvar vidas en cualquier momento.",
+      "transicion": {
+        "indicaciones_ia": "Avisa al estudiante que comenzarán con una situación real para entender por qué es importante la prevención de incendios",
+        "frase_transicion": "Vamos a comenzar conectando con un caso que ocurrió realmente. Esto nos ayudará a entender por qué es importante lo que veremos"
+      }
+    },
+    {
+      "momento": "MOMENTO_1",
+      "titulo": "CONEXIÓN CON SABERES PREVIOS Y RELEVANCIA",
+      "palabras_clave": ["conexion", "saberes_previos", "relevancia", "caso_real", "evento_impactante", "importancia_prevencion"],
+      "objetivo": "Conectar conocimientos previos con la relevancia del tema",
+      "duracion": "15 minutos",
+      "accion_docente_ia": "Conecta con un evento real o impactante que refuerce la importancia de la prevención de incendios",
+      "indicaciones": "Muestra este video o describe el siguiente caso: Hace dos años, en una oficina, un cortocircuito en una computadora causó un incendio que se propagó rápidamente. Aunque había extintores disponibles, nadie sabía cómo usarlos correctamente.",
+      "preguntas": [
+        {
+          "numero": 1,
+          "texto": "¿Qué crees que falló en ese caso?",
+          "tipo": "pregunta_reflexiva",
+          "respuesta_correcta": "No sabían usar los extintores o No identificaron el riesgo de cortocircuito",
+          "respuesta_incorrecta": "Fue culpa del electricista",
+          "correccion_ia": "En prevención de incendios no buscamos culpas, sino prevenir. Lo que importa es entender qué falló en el sistema de prevención"
+        },
+        {
+          "numero": 2,
+          "texto": "¿Por qué crees que es importante saber prevenir incendios en el trabajo?",
+          "tipo": "pregunta_relevancia",
+          "respuesta_correcta": "Para proteger vidas y evitar pérdidas materiales",
+          "respuesta_incorrecta": "Porque lo exige la ley",
+          "correccion_ia": "Es más que un requisito legal. Un incendio puede costar vidas y destruir todo en minutos"
+        }
+      ],
+      "transicion": {
+        "indicaciones_ia": "Felicita brevemente al estudiante por participar y anticipa que ahora explicarán los componentes del triángulo del fuego",
+        "frase_transicion": "Muy bien, gracias por tus respuestas. Ahora te voy a explicar paso a paso qué es el triángulo del fuego y cómo prevenimos incendios"
+      }
+    },
+    {
+      "momento": "MOMENTO_2",
+      "titulo": "ADQUISICIÓN DE CONOCIMIENTOS BÁSICOS",
+      "palabras_clave": ["adquisicion_conocimientos", "triangulo_fuego", "combustible", "oxigeno", "calor", "extintores", "tipos_incendio"],
+      "objetivo": "Explicar cada componente del triángulo del fuego de manera sencilla",
+      "duracion": "20 minutos",
+      "accion_docente_ia": "Explica cada componente del triángulo del fuego de manera sencilla, una por una. Después de explicar, pide un ejemplo",
+      "explicacion_breve": "El fuego necesita tres elementos para existir: Combustible, Oxígeno y Calor. Si eliminamos uno, el fuego se apaga. Empecemos por el primer elemento.",
+      "preguntas": [
+        {
+          "numero": 1,
+          "texto": "¿Podrías darme un ejemplo de un combustible que podrías encontrar en tu trabajo?",
+          "tipo": "pregunta_ejemplo",
+          "respuesta_correcta": "Papel, madera, gasolina, aceite",
+          "respuesta_incorrecta": "El aire",
+          "correccion_ia": "El aire es el oxígeno, no el combustible. El combustible es lo que se quema"
+        },
+        {
+          "numero": 2,
+          "texto": "¿Cómo podrías eliminar el oxígeno de un fuego pequeño?",
+          "tipo": "pregunta_control",
+          "respuesta_correcta": "Cubriendo con una manta o usando un extintor de CO2",
+          "respuesta_incorrecta": "Soplando",
+          "correccion_ia": "Soplar puede avivar el fuego. Necesitamos sofocarlo sin oxígeno"
+        },
+        {
+          "numero": 3,
+          "texto": "Si hay mucho combustible y oxígeno disponible, ¿el riesgo de incendio será alto, medio o bajo?",
+          "tipo": "pregunta_evaluacion",
+          "respuesta_correcta": "Alto",
+          "respuesta_incorrecta": "Bajo",
+          "correccion_ia": "Explica con una escala visual simple si es necesario"
+        }
+      ],
+      "transicion": {
+        "indicaciones_ia": "Informa al estudiante que ahora pondrá en práctica lo aprendido con un caso realista",
+        "frase_transicion": "Vamos a aplicar lo que has aprendido en una situación real. Quiero que pienses como si tú estuvieras ahí"
+      }
+    },
+    {
+      "momento": "MOMENTO_3",
+      "titulo": "APLICACIÓN PRÁCTICA",
+      "palabras_clave": ["aplicacion_practica", "caso_realista", "incendio_oficina", "extintor", "actividad_guiada", "practica_extintor"],
+      "objetivo": "Aplicar conocimientos en situación práctica",
+      "duracion": "25 minutos",
+      "accion_docente_ia": "Plantea el siguiente caso: Hay un incendio pequeño en una papelera de la oficina. ¿Qué harías primero?",
+      "caso_practico": "Hay un incendio pequeño en una papelera de la oficina. ¿Qué harías primero?",
+      "preguntas": [
+        {
+          "numero": 1,
+          "texto": "¿Cuál es el peligro más evidente en esta situación?",
+          "tipo": "pregunta_identificacion",
+          "respuesta_correcta": "El fuego puede propagarse rápidamente",
+          "respuesta_incorrecta": "El humo manchará la pared",
+          "correccion_ia": "El humo es peligroso, pero el riesgo principal es la propagación del fuego"
+        },
+        {
+          "numero": 2,
+          "texto": "¿Qué control aplicarías para ese peligro?",
+          "tipo": "pregunta_control",
+          "respuesta_correcta": "Usar el extintor más cercano o evacuar si es necesario",
+          "respuesta_incorrecta": "Dejar que se apague solo",
+          "correccion_ia": "Un incendio no se apaga solo, puede propagarse rápidamente"
+        }
+      ],
+      "actividad_guiada": "Ayúdalo a construir una mini matriz de prevención de 3 columnas: Peligro – Riesgo – Control. Corrige si confunde categorías",
+      "transicion": {
+        "indicaciones_ia": "Indica que ahora compararán su análisis con una propuesta de referencia",
+        "frase_transicion": "Muy bien, ahora quiero mostrarte cómo resolvería esta situación un especialista. Veamos cómo se compara con tu análisis"
+      }
+    },
+    {
+      "momento": "MOMENTO_4",
+      "titulo": "DISCUSIÓN Y CONTRASTE",
+      "palabras_clave": ["discusion", "contraste", "matriz_prevencion_modelo", "comparacion", "analisis", "mejora"],
+      "objetivo": "Comparar análisis del estudiante con propuesta de referencia",
+      "duracion": "15 minutos",
+      "accion_docente_ia": "Comparte una matriz de prevención modelo. Luego, pregúntale",
+      "preguntas": [
+        {
+          "numero": 1,
+          "texto": "¿En qué se parece tu matriz a esta? ¿Identificaste el mismo peligro?",
+          "tipo": "pregunta_comparacion",
+          "respuesta_correcta": "Sí, también puse el riesgo de propagación del fuego",
+          "respuesta_incorrecta": "No puse nada",
+          "correccion_ia": "No hay problema. Este es un momento para comparar y aprender. Miremos de nuevo juntos"
+        },
+        {
+          "numero": 2,
+          "texto": "¿Cambiarías algo de tu propuesta ahora que ves esta matriz?",
+          "tipo": "pregunta_mejora",
+          "respuesta_correcta": "Sí, creo que puedo mejorar el control",
+          "respuesta_incorrecta": "No importa mucho",
+          "correccion_ia": "Importa porque el control correcto puede salvar una vida. Volvamos a mirar tu opción"
+        }
+      ],
+      "transicion": {
+        "indicaciones_ia": "Agradece la participación y plantea una última pregunta reflexiva para cerrar",
+        "frase_transicion": "Muy buen trabajo hasta aquí. Vamos a terminar con una pregunta para que apliques esto a tu vida laboral"
+      }
+    },
+    {
+      "momento": "MOMENTO_5",
+      "titulo": "REFLEXIÓN FINAL Y CIERRE",
+      "palabras_clave": ["reflexion_final", "cierre", "aplicacion_vida_laboral", "proyeccion", "contexto_real"],
+      "objetivo": "Proyectar al estudiante a su contexto real",
+      "duracion": "10 minutos",
+      "accion_docente_ia": "Plantea una pregunta que proyecte al estudiante a su contexto real",
+      "preguntas": [
+        {
+          "numero": 1,
+          "texto": "Si mañana ves humo saliendo de una máquina en tu área de trabajo, ¿qué es lo primero que debes hacer?",
+          "tipo": "pregunta_aplicacion",
+          "respuesta_correcta": "Activar la alarma de incendio y evacuar",
+          "respuesta_incorrecta": "Intentar apagarlo yo solo",
+          "correccion_ia": "Tu seguridad es lo primero. Activa la alarma y evacúa, los bomberos sabrán qué hacer"
+        }
+      ],
+      "cierre_docente_ia": "Muy bien, [nombre], hoy diste un gran paso. Recuerda que la prevención de incendios es más que saber usar un extintor: es una forma de pensar. Estar atento a los riesgos y saber qué hacer puede proteger tu vida y la de los demás. ¿Qué te gustaría reforzar la próxima vez?"
+    }
+  ]
+}
