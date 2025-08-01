@@ -1,5 +1,4 @@
 const readline = require('readline');
-const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const { OpenAI } = require('openai');
@@ -25,7 +24,6 @@ const conversationState = {
   isInClass: false,
   studentName: 'estudiante',
   messages: [], // Historial de mensajes en formato OpenAI
-  serverPort: 3000,
   // Nuevas variables para momentos personalizados
   momentosPersonalizados: null,
   contenidoReal: null,
@@ -37,22 +35,6 @@ const conversationState = {
 // Función para imprimir con colores
 function print(color, text) {
   console.log(`${colors[color]}${text}${colors.reset}`);
-}
-
-// Función para detectar el puerto del servidor
-async function detectServerPort() {
-  for (let port = 3000; port <= 3005; port++) {
-    try {
-      const response = await axios.get(`http://localhost:${port}`, { timeout: 1000 });
-      if (response.status === 200) {
-        conversationState.serverPort = port;
-        return port;
-      }
-    } catch (error) {
-      continue;
-    }
-  }
-  return 3000; // Puerto por defecto
 }
 
 // Función para cargar la base de datos de cursos
@@ -205,28 +187,6 @@ Responde solo con el momento personalizado, sin explicaciones adicionales.`
     
   } catch (error) {
     print('red', `❌ Error generando momentos personalizados: ${error.message}`);
-    return null;
-  }
-}
-
-// Función para consultar OpenAI optimizada (con embeddings)
-async function queryOpenAI(query, sessionId, courseId) {
-  try {
-    const response = await axios.post(`http://localhost:${conversationState.serverPort}/api/openai-vector`, {
-      query,
-      sessionId,
-      courseId
-    }, {
-      timeout: 20000 // Reducido de 30s a 15s
-    });
-    
-    return response.data.response;
-  } catch (error) {
-    if (error.code === 'ECONNABORTED') {
-      print('red', '❌ Timeout: La respuesta tardó demasiado. Intenta de nuevo.');
-    } else {
-      print('red', `❌ Error consultando OpenAI: ${error.message}`);
-    }
     return null;
   }
 }
@@ -530,10 +490,6 @@ function showHelp() {
 
 // Función principal del chat
 async function startChat() {
-  // Detectar puerto del servidor
-  await detectServerPort();
-  print('green', `🌐 Servidor detectado en puerto ${conversationState.serverPort}`);
-  
   // Crear interfaz de readline
   const rl = readline.createInterface({
     input: process.stdin,
