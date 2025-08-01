@@ -167,28 +167,18 @@ async function generateMomentosConFileId(teachingGuide, contenidoReal, courseNam
         messages: [
           {
             role: "system",
-            content: `Eres un especialista en pedagogía que personaliza momentos de enseñanza. 
-            
-ESTRUCTURA DEL MOMENTO A PERSONALIZAR:
+            content: `Eres un especialista en pedagogía. Personaliza el momento de enseñanza adaptándolo al contenido específico del archivo. Mantén la estructura pedagógica y usa ejemplos relevantes al tema.`
+          },
+          {
+            role: "user",
+            content: `Personaliza el momento "${momento.titulo}" para el curso ${courseName} - ${sessionName} usando el contenido del archivo ${fileId}. 
+
+MOMENTO A PERSONALIZAR:
 - Título: ${momento.titulo}
 - Descripción: ${momento.descripcion}
 - Ejemplos: ${momento.ejemplos.join(', ')}
 
-CURSO: ${courseName}
-SESIÓN: ${sessionName}
-ARCHIVO: ${fileId}
-
-Genera una versión personalizada de este momento que:
-1. Se adapte específicamente al contenido del archivo
-2. Use ejemplos relevantes al tema
-3. Mantenga la estructura pedagógica
-4. Sea específico para ${courseName} - ${sessionName}
-
 Responde solo con el momento personalizado, sin explicaciones adicionales.`
-          },
-          {
-            role: "user",
-            content: `Personaliza el momento "${momento.titulo}" basándote en el contenido del archivo ${fileId}. Usa información específica del archivo para hacer el momento relevante al curso ${courseName} - ${sessionName}.`
           }
         ],
         max_tokens: 2000,
@@ -387,46 +377,22 @@ async function startClass() {
   conversationState.messages = []; // Limpiar historial
   conversationState.momentoActual = 0; // Iniciar en el primer momento
   
-  // Configurar el system prompt con personalidad pedagógica completa
+  // System prompt ultra-optimizado y consolidado
   const pedagogia = conversationState.pedagogiaUniversal.pedagogia_universal;
-  const systemPrompt = `Eres un ${conversationState.currentCourse.specialist_role} aplicando la metodología "Teach Like a Champion" con enfoque inductivo puro.
+  const systemPrompt = `Eres un ${conversationState.currentCourse.specialist_role} que tienes que seguir estos momentos de la clase basándote del contenido del archivo ${conversationState.currentSession.file_id} con la personalidad pedagógica de ${pedagogia.principios_fundamentales.filosofia_base}.
 
 CURSO: ${conversationState.currentCourse.name}
 SESIÓN: ${conversationState.currentSession.name}
 OBJETIVO: ${conversationState.currentSession.learning_objective}
-PUNTOS CLAVE: ${conversationState.currentSession.key_points.join(', ')}
 
-PERSONALIDAD PEDAGÓGICA - PRINCIPIOS FUNDAMENTALES:
-- Filosofía: ${pedagogia.principios_fundamentales.filosofia_base}
-- Enfoque respuestas: ${pedagogia.principios_fundamentales.enfoque_respuestas}
-- Manejo errores: ${pedagogia.principios_fundamentales.manejo_errores}
-- Validación: ${pedagogia.principios_fundamentales.validacion}
-- Personalización: ${pedagogia.principios_fundamentales.personalizacion}
-
-MOMENTOS PEDAGÓGICOS DISPONIBLES:
-${Object.entries(pedagogia.momentos_pedagogicos).map(([key, momento]) => 
-  `${key}: ${momento.objetivo_pedagogico}`
-).join('\n')}
-
-PRINCIPIOS TRANSVERSALES:
-- Adaptación ritmo: ${pedagogia.principios_transversales.adaptacion_ritmo.join(', ')}
-- Mantenimiento engagement: ${pedagogia.principios_transversales.mantenimiento_engagement.join(', ')}
-- Construcción confianza: ${pedagogia.principios_transversales.construccion_confianza.join(', ')}
-
-MOMENTOS PERSONALIZADOS DE LA CLASE:
+MOMENTOS DE LA CLASE:
 ${conversationState.momentosPersonalizados.map((momento, index) => 
   `${index + 1}. ${momento.titulo}: ${momento.personalizado}`
 ).join('\n')}
 
-INSTRUCCIONES CRÍTICAS:
-- NUNCA dar definiciones directas (metodología inductiva pura)
-- Usar técnicas específicas de cada momento pedagógico
-- Construir sobre respuestas parciales, nunca descartar totalmente
-- Verificar comprensión constantemente antes de avanzar
-- Adaptar al ritmo del estudiante individual
-- Mantener engagement y construir confianza
-- Aplicar "Right is Right" - solo respuestas completamente correctas
-- Usar "Stretch It" - profundizar con "¿Por qué?" o "¿Qué más?"`;
+PERSONALIDAD: ${pedagogia.principios_fundamentales.enfoque_respuestas}. ${pedagogia.principios_fundamentales.manejo_errores}. ${pedagogia.principios_fundamentales.validacion}.
+
+INSTRUCCIONES: NUNCA dar definiciones directas, construir sobre respuestas parciales, usar "Right is Right" y "Stretch It".`;
 
   // Agregar mensaje del sistema
   conversationState.messages.push({
@@ -436,9 +402,9 @@ INSTRUCCIONES CRÍTICAS:
   
   print('green', `🎓 ¡Bienvenido a la clase de ${conversationState.currentSession.name}!`);
   print('cyan', '🧠 Aplicando metodología "Teach Like a Champion" con enfoque inductivo puro.');
-  print('cyan', '🎯 Personalidad pedagógica completa cargada.');
+  print('cyan', '🎯 Personalidad pedagógica ultra-optimizada cargada.');
   print('cyan', '📁 Contenido real de archivos cargado.');
-  print('cyan', '⚡ Modo optimizado: Sin generación de embeddings durante conversación.\n');
+  print('cyan', '⚡ Modo ultra-rápido: Un solo prompt consolidado.\n');
   
   // Usar el primer momento personalizado para el saludo
   const primerMomento = conversationState.momentosPersonalizados[0];
@@ -461,54 +427,26 @@ async function generateAIResponse(userMessage) {
     content: userMessage
   });
   
-  // Determinar el momento actual basado en la conversación
-  const momentoActual = conversationState.momentoActual;
-  if (conversationState.momentosPersonalizados && momentoActual < conversationState.momentosPersonalizados.length) {
-    const momento = conversationState.momentosPersonalizados[momentoActual];
-    
-    // Agregar contexto del momento actual al historial de mensajes
-    conversationState.messages.push({
-      role: 'system',
-      content: `MOMENTO ACTUAL: ${momento.titulo}\n${momento.personalizado}`
-    });
-    
-    // Usar función directa sin embeddings
-    const response = await queryOpenAIDirect(conversationState.messages);
-    
-    // Remover el mensaje del momento actual del historial (para no acumular)
-    conversationState.messages.pop();
-    
-    // Avanzar al siguiente momento después de una respuesta exitosa
-    if (response) {
-      conversationState.momentoActual++;
-      if (conversationState.momentoActual >= conversationState.momentosPersonalizados.length) {
-        print('green', '🎉 ¡Has completado todos los momentos de la sesión!');
-      }
+  // Usar función directa sin embeddings - el system prompt ya tiene todo el contexto
+  const response = await queryOpenAIDirect(conversationState.messages);
+  
+  // Avanzar al siguiente momento después de una respuesta exitosa
+  if (response && conversationState.momentosPersonalizados) {
+    conversationState.momentoActual++;
+    if (conversationState.momentoActual >= conversationState.momentosPersonalizados.length) {
+      print('green', '🎉 ¡Has completado todos los momentos de la sesión!');
     }
-    
-    if (response) {
-      // Agregar respuesta de la IA al historial
-      conversationState.messages.push({
-        role: 'assistant',
-        content: response
-      });
-    }
-    
-    return response;
-  } else {
-    // Fallback si no hay momentos personalizados - usar función directa
-    const response = await queryOpenAIDirect(conversationState.messages);
-    
-    if (response) {
-      // Agregar respuesta de la IA al historial
-      conversationState.messages.push({
-        role: 'assistant',
-        content: response
-      });
-    }
-    
-    return response;
   }
+  
+  if (response) {
+    // Agregar respuesta de la IA al historial
+    conversationState.messages.push({
+      role: 'assistant',
+      content: response
+    });
+  }
+  
+  return response;
 }
 
 // Función para procesar comandos
