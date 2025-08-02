@@ -12,6 +12,8 @@ export interface Course {
   id: string;
   name: string;
   description: string;
+  specialist_role: string;
+  vector_store_id: string;
   sessions: Session[];
   metadata: {
     total_sessions: number;
@@ -73,4 +75,15 @@ export function getSessionInfo(sessionId: string): Session | null {
   }
   
   return null;
+}
+
+// Función para obtener el vector_store_id de un curso
+export function getCourseVectorStoreId(courseId: string): string | null {
+  const course = courseData.courses.find(c => c.id === courseId);
+  return course ? course.vector_store_id : null;
+}
+
+// Función para obtener información completa de un curso
+export function getCourseInfo(courseId: string): Course | null {
+  return courseData.courses.find(c => c.id === courseId) || null;
 } 

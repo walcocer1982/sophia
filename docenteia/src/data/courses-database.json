@@ -5,6 +5,7 @@
       "name": "Seguridad y Salud Ocupacional",
       "description": "Curso completo de SSO con múltiples sesiones de capacitación",
       "specialist_role": "Especialista en Seguridad y Salud Ocupacional",
+      "vector_store_id": "vs_68823f69d9f08191889fed8f8edd891c",
       "sessions": [
         {
           "id": "sesion01",
@@ -22,7 +23,7 @@
         {
           "id": "sesion02", 
           "name": "Sesión 02 de SSO",
-          "file_id": "file-MLGFPC2nruo5t5jjC9En1a",
+          "file_id": "file-MLGfPC2nruo5t5jjC9En1a",
           "file_name": "contenido_sso_sesion02_MSEII.json",
           "learning_objective": "El estudiante aplica procedimientos de seguridad en situaciones específicas del trabajo",
           "key_points": [
@@ -58,11 +59,12 @@
       "name": "Operación de Equipos de Perforación",
       "description": "Curso completo de perforación con múltiples sesiones de capacitación",
       "specialist_role": "Especialista en operación de equipos de perforación",
+      "vector_store_id": "vs_perforacion_equipos_2025",
       "sessions": [
         {
           "id": "sesion01",
           "name": "Fundamentos de Perforación",
-          "file_id": "file-LtVxVon3svgvNrafJLhbXS",
+          "file_id": "file-DAgoSoKwe6frEGeV2WPKFp",
           "file_name": "contenido_perforacion_sesion01.md",
           "learning_objective": "El estudiante identifica los componentes principales de un equipo de perforación y explica su función en el proceso",
           "key_points": [
@@ -75,7 +77,7 @@
         {
           "id": "sesion02",
           "name": "Técnicas de Perforación",
-          "file_id": "file-MLGFPC2nruo5t5jjC9En1a",
+          "file_id": "file-J8LReNPzix92Ly8PTxeJaQ",
           "file_name": "contenido_perforacion_sesion02.md",
           "learning_objective": "El estudiante aplica técnicas de perforación según el tipo de terreno y objetivo",
           "key_points": [
@@ -88,7 +90,7 @@
         {
           "id": "sesion03",
           "name": "Mantenimiento de Equipos de Perforación",
-          "file_id": "file-MPwrLaMwDkie5yQrymSRqo",
+          "file_id": "file-MLGfPC2nruo5t5jjC9En1a",
           "file_name": "contenido_perforacion_sesion03.md",
           "learning_objective": "El estudiante realiza mantenimiento preventivo y correctivo en equipos de perforación",
           "key_points": [

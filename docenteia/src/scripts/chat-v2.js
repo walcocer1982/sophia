@@ -1,7 +1,7 @@
 const readline = require('readline');
 const fs = require('fs');
 const path = require('path');
-const { OpenAI } = require('openai');
+const VectorStoreExtractor = require('../lib/vector-store-extractor');
 require('dotenv').config({ path: path.join(__dirname, '../../.env.local') });
 
 // Colores para la terminal
@@ -19,17 +19,14 @@ const colors = {
 
 // Estado global de la conversación
 const conversationState = {
-  currentCourse: null,
-  currentSession: null,
-  isInClass: false,
-  studentName: 'estudiante',
-  messages: [], // Historial de mensajes en formato OpenAI
-  // Nuevas variables para momentos personalizados
-  momentosPersonalizados: null,
-  contenidoReal: null,
+  selectedCourse: null,
+  selectedSession: null,
+  vectorStoreExtractor: null,
+  currentSessionKey: null,
   momentoActual: 0,
-  teachingGuide: null,
-  pedagogiaUniversal: null
+  momentos: [],
+  messages: [],
+  isInClass: false
 };
 
 // Función para imprimir con colores
@@ -43,185 +40,11 @@ function loadCoursesDatabase() {
     const filePath = path.join(__dirname, '../data/courses-database.json');
     const data = fs.readFileSync(filePath, 'utf8');
     return JSON.parse(data);
-  } catch (error) {
+  } catch {
     print('red', '❌ Error cargando la base de datos de cursos');
     return null;
   }
 }
-
-
-
-// Función para cargar la guía de enseñanza
-function loadTeachingGuide() {
-  try {
-    const filePath = path.join(__dirname, '../data/teaching-guide.json');
-    const data = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    print('red', '❌ Error cargando la guía de enseñanza');
-    return null;
-  }
-}
-
-// Función para cargar la pedagogía universal (personalidad del modelo)
-function loadPedagogiaUniversal() {
-  try {
-    const filePath = path.join(__dirname, '../data/pedagogia-universal.json');
-    const data = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    print('red', '❌ Error cargando la pedagogía universal');
-    return null;
-  }
-}
-
-// Función para cargar contenido real de archivos por file_ID
-async function loadFileContent(fileId, fileName) {
-  try {
-    print('yellow', `🔄 Cargando contenido real del archivo: ${fileName} (${fileId})`);
-    
-    // Verificar API key
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      print('red', '❌ Error: OPENAI_API_KEY no encontrada');
-      return null;
-    }
-    
-    const openai = new OpenAI({
-      apiKey: apiKey
-    });
-    
-    // Usar la API correcta para acceder al contenido del archivo
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system", 
-          content: `Eres un asistente especializado en extraer y organizar contenido de archivos. 
-          
-INSTRUCCIONES:
-- Extrae el contenido completo del archivo ${fileName} (ID: ${fileId})
-- Organiza la información de manera clara y estructurada
-- Mantén toda la estructura original del contenido
-- Si no puedes acceder al archivo, indica claramente el error`
-        },
-        {
-          role: "user", 
-          content: `Necesito el contenido completo del archivo ${fileName} con ID ${fileId}. Por favor extrae toda la información disponible y organízala de manera clara.`
-        }
-      ],
-      max_tokens: 4000,
-      temperature: 0.1
-    });
-    
-    const content = completion.choices[0]?.message?.content;
-    
-    if (content) {
-      print('green', `✅ Contenido real cargado: ${fileName}`);
-      return content;
-    } else {
-      print('red', `❌ Error: No se pudo extraer contenido del archivo ${fileName}`);
-      return null;
-    }
-    
-  } catch (error) {
-    print('red', `❌ Error cargando contenido real del archivo: ${error.message}`);
-    return null;
-  }
-}
-
-// Función para generar momentos personalizados usando contenido real
-async function generateMomentosConFileId(teachingGuide, contenidoReal, courseName, sessionName, fileId) {
-  try {
-    print('yellow', '🔄 Generando momentos personalizados con contenido real...');
-    
-    const momentos = [];
-    
-    for (let i = 0; i < teachingGuide.momentos.length; i++) {
-      const momento = teachingGuide.momentos[i];
-      
-      // Usar file_search para generar momento personalizado con contenido real
-      const apiKey = process.env.OPENAI_API_KEY;
-      const openai = new OpenAI({ apiKey: apiKey });
-      
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: `Eres un especialista en pedagogía. Personaliza el momento de enseñanza adaptándolo al contenido específico del archivo. Mantén la estructura pedagógica y usa ejemplos relevantes al tema.`
-          },
-          {
-            role: "user",
-            content: `Personaliza el momento "${momento.titulo}" para el curso ${courseName} - ${sessionName} usando el contenido del archivo ${fileId}. 
-
-MOMENTO A PERSONALIZAR:
-- Título: ${momento.titulo}
-- Descripción: ${momento.descripcion}
-- Ejemplos: ${momento.ejemplos.join(', ')}
-
-Responde solo con el momento personalizado, sin explicaciones adicionales.`
-          }
-        ],
-        max_tokens: 2000,
-        temperature: 0.3
-      });
-      
-      const momentoPersonalizado = completion.choices[0]?.message?.content;
-      
-      if (momentoPersonalizado) {
-        momentos.push({
-          id: momento.momento,
-          titulo: momento.titulo,
-          descripcion: momento.descripcion,
-          ejemplos: momento.ejemplos,
-          personalizado: momentoPersonalizado
-        });
-        
-        print('green', `✅ ${momento.momento} personalizado con contenido real`);
-      }
-    }
-    
-    print('green', `✅ Todos los momentos personalizados generados (${momentos.length})`);
-    return momentos;
-    
-  } catch (error) {
-    print('red', `❌ Error generando momentos personalizados: ${error.message}`);
-    return null;
-  }
-}
-
-// Función para consultar OpenAI directamente sin embeddings (para conversación)
-async function queryOpenAIDirect(messages) {
-  try {
-    // Verificar API key
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      print('red', '❌ Error: OPENAI_API_KEY no encontrada');
-      return null;
-    }
-    
-    const openai = new OpenAI({
-      apiKey: apiKey
-    });
-    
-    // Llamada directa a OpenAI sin embeddings
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: messages,
-      max_tokens: 1000,
-      temperature: 0.7
-    });
-    
-    return completion.choices[0].message.content;
-    
-  } catch (error) {
-    print('red', `❌ Error consultando OpenAI directamente: ${error.message}`);
-    return null;
-  }
-}
-
-
 
 // Función para mostrar cursos disponibles
 function showCourses() {
@@ -231,6 +54,8 @@ function showCourses() {
   print('cyan', '\n📚 Cursos Disponibles:');
   data.courses.forEach((course, index) => {
     print('white', `${index + 1}. ${course.id} - ${course.name}`);
+    print('yellow', `   👨‍🏫 ${course.specialist_role}`);
+    print('yellow', `   📊 ${course.sessions.length} sesiones disponibles`);
   });
   print('yellow', '\n💡 Usa: /select <curso> <sesión> para seleccionar');
   print('yellow', '   Ejemplo: /select SSO001 1');
@@ -238,258 +63,323 @@ function showCourses() {
 
 // Función para seleccionar curso y sesión
 async function selectCourse(courseId, sessionNumber) {
+  try {
+    const sessionId = `sesion0${sessionNumber}`;
+    
+    // Cargar datos del curso desde la base de datos
   const data = loadCoursesDatabase();
-  if (!data || !data.courses) return false;
+    if (!data || !data.courses) {
+      console.error('❌ No se pudo cargar la base de datos de cursos');
+      return;
+    }
   
   const course = data.courses.find(c => c.id === courseId);
   if (!course) {
-    print('red', `❌ Curso ${courseId} no encontrado`);
-    return false;
+      console.error(`❌ Curso ${courseId} no encontrado`);
+      return;
   }
   
   // Validar que el número de sesión sea válido
   if (sessionNumber < 1 || sessionNumber > course.sessions.length) {
-    print('red', `❌ Sesión ${sessionNumber} no encontrada. Sesiones disponibles: 1-${course.sessions.length}`);
-    return false;
+      console.error(`❌ Sesión ${sessionNumber} no encontrada. Sesiones disponibles: 1-${course.sessions.length}`);
+      return;
   }
   
   const session = course.sessions[sessionNumber - 1];
   if (!session) {
-    print('red', `❌ Sesión ${sessionNumber} no encontrada`);
-    return false;
+      console.error(`❌ Sesión ${sessionNumber} no encontrada`);
+      return;
+    }
+    
+    // Actualizar estado de la conversación
+    conversationState.selectedCourse = course;
+    conversationState.selectedSession = session;
+    
+    console.log(`✅ Curso seleccionado: ${course.name}`);
+    console.log(`✅ Sesión seleccionada: ${session.name}`);
+    console.log(`✅ Especialista: ${course.specialist_role}`);
+    console.log(`✅ Objetivo: ${session.learning_objective}`);
+    console.log(`📁 File ID: ${session.file_id}`);
+    console.log(`📄 Archivo: ${session.file_name}`);
+    console.log(`🔗 Vector Store ID: ${course.vector_store_id}`);
+
+    // Inicializar el extractor optimizado
+    conversationState.vectorStoreExtractor = new VectorStoreExtractor();
+    
+    console.log(`🚀 Iniciando sesión optimizada...`);
+    
+    // Iniciar sesión optimizada con fragmentos pre-calculados
+    const sessionInfo = await conversationState.vectorStoreExtractor.startSession(courseId, sessionId);
+    conversationState.currentSessionKey = sessionInfo.sessionKey;
+    
+    console.log(`✅ Sesión iniciada: ${sessionInfo.momentos} momentos, ${sessionInfo.fragmentos} fragmentos`);
+    console.log(`✅ Clave de sesión: ${sessionInfo.sessionKey}`);
+    console.log(`✅ Momento actual: ${sessionInfo.currentMoment}`);
+
+    // Obtener momentos para mostrar estructura
+    conversationState.momentos = await conversationState.vectorStoreExtractor.getMomentosDelArchivo(courseId, sessionId);
+    conversationState.momentoActual = 0;
+
+    console.log(`📄 Momentos extraídos: ${conversationState.momentos.length}`);
+    console.log(`🔗 Estructura de la clase:`);
+    conversationState.momentos.forEach((momento, index) => {
+      console.log(`   ${index + 1}. ${momento.momento}`);
+    });
+
+  } catch (error) {
+    console.error(`❌ Error seleccionando curso: ${error.message}`);
   }
-  
-  conversationState.currentCourse = course;
-  conversationState.currentSession = session;
-  
-  print('green', `✅ Curso seleccionado: ${course.name}`);
-  print('green', `✅ Sesión seleccionada: ${session.name}`);
-  print('green', `✅ Especialista: ${course.specialist_role}`);
-  print('green', `✅ Objetivo: ${session.learning_objective}`);
-  print('cyan', `📁 File ID: ${session.file_id}`);
-  print('cyan', `📄 Archivo: ${session.file_name}`);
-  
-  // Cargar todo el contexto al inicio (una sola vez)
-  print('yellow', '🔄 Cargando contexto completo...');
-  
-  // 1. Cargar pedagogía universal (personalidad del modelo)
-  conversationState.pedagogiaUniversal = loadPedagogiaUniversal();
-  if (!conversationState.pedagogiaUniversal) {
-    print('red', '❌ Error cargando pedagogía universal');
-    return false;
-  }
-  print('green', '✅ Pedagogía universal cargada (personalidad del modelo)');
-  
-  // 2. Cargar teaching guide (estructura de momentos)
-  conversationState.teachingGuide = loadTeachingGuide();
-  if (!conversationState.teachingGuide) {
-    print('red', '❌ Error cargando teaching guide');
-    return false;
-  }
-  print('green', '✅ Teaching guide cargado (estructura de momentos)');
-  
-  // 3. Cargar contenido real del archivo usando file_id
-  conversationState.contenidoReal = await loadFileContent(session.file_id, session.file_name);
-  if (!conversationState.contenidoReal) {
-    print('red', '❌ Error cargando contenido real del archivo');
-    return false;
-  }
-  print('green', '✅ Contenido real del archivo cargado');
-  
-  // 4. Generar momentos personalizados con contenido real
-  conversationState.momentosPersonalizados = await generateMomentosConFileId(
-    conversationState.teachingGuide,
-    conversationState.contenidoReal,
-    course.name,
-    session.name,
-    session.file_id
-  );
-  
-  if (!conversationState.momentosPersonalizados) {
-    print('red', '❌ Error generando momentos personalizados');
-    return false;
-  }
-  
-  print('green', `✅ Contexto completo cargado (${conversationState.momentosPersonalizados.length} momentos)`);
-  print('cyan', '🚀 Listo para iniciar la clase con momentos personalizados');
-  
-  return true;
 }
 
 // Función para iniciar la clase
-async function startClass() {
-  if (!conversationState.currentCourse || !conversationState.currentSession) {
+function startClass() {
+  if (!conversationState.selectedCourse || !conversationState.selectedSession) {
     print('red', '❌ Debes seleccionar un curso y sesión primero');
     return;
   }
   
-  if (!conversationState.momentosPersonalizados) {
-    print('red', '❌ No hay momentos personalizados cargados. Usa /select primero');
-    return;
-  }
-  
-  if (!conversationState.pedagogiaUniversal) {
-    print('red', '❌ No hay pedagogía universal cargada. Usa /select primero');
+  if (!conversationState.momentos || conversationState.momentos.length === 0) {
+    print('red', '❌ No hay momentos cargados. Usa /select primero');
     return;
   }
   
   conversationState.isInClass = true;
-  conversationState.messages = []; // Limpiar historial
-  conversationState.momentoActual = 0; // Iniciar en el primer momento
+  conversationState.messages = [];
+  conversationState.momentoActual = 0;
   
-  // System prompt ultra-optimizado y consolidado
-  const pedagogia = conversationState.pedagogiaUniversal.pedagogia_universal;
-  const systemPrompt = `Eres un ${conversationState.currentCourse.specialist_role} que tienes que seguir estos momentos de la clase basándote del contenido del archivo ${conversationState.currentSession.file_id} con la personalidad pedagógica de ${pedagogia.principios_fundamentales.filosofia_base}.
-
-CURSO: ${conversationState.currentCourse.name}
-SESIÓN: ${conversationState.currentSession.name}
-OBJETIVO: ${conversationState.currentSession.learning_objective}
-
-MOMENTOS DE LA CLASE:
-${conversationState.momentosPersonalizados.map((momento, index) => 
-  `${index + 1}. ${momento.titulo}: ${momento.personalizado}`
-).join('\n')}
-
-PERSONALIDAD: ${pedagogia.principios_fundamentales.enfoque_respuestas}. ${pedagogia.principios_fundamentales.manejo_errores}. ${pedagogia.principios_fundamentales.validacion}.
-
-INSTRUCCIONES: NUNCA dar definiciones directas, construir sobre respuestas parciales, usar "Right is Right" y "Stretch It".`;
-
-  // Agregar mensaje del sistema
-  conversationState.messages.push({
-    role: 'system',
-    content: systemPrompt
-  });
+  print('green', `🎓 ¡Bienvenido a la clase de ${conversationState.selectedSession.name}!`);
+  print('cyan', '🧠 Docente IA especializado cargado');
+  print('cyan', '📁 Contenido extraído del Vector Store');
+  print('cyan', '⚡ Interfaz interactiva lista\n');
   
-  print('green', `🎓 ¡Bienvenido a la clase de ${conversationState.currentSession.name}!`);
-  print('cyan', '🧠 Aplicando metodología "Teach Like a Champion" con enfoque inductivo puro.');
-  print('cyan', '🎯 Personalidad pedagógica ultra-optimizada cargada.');
-  print('cyan', '📁 Contenido real de archivos cargado.');
-  print('cyan', '⚡ Modo ultra-rápido: Un solo prompt consolidado.\n');
-  
-  // Usar el primer momento personalizado para el saludo
-  const primerMomento = conversationState.momentosPersonalizados[0];
-  const greeting = await generateAIResponse(`Aplica el primer momento personalizado: ${primerMomento.personalizado}`);
-  
-  if (greeting) {
-    print('cyan', `👨‍🏫 ${greeting}`);
+  const primerMomento = conversationState.momentos[0];
+  print('cyan', `👨‍🏫 ¡Hola! Soy tu ${conversationState.selectedCourse.specialist_role}`);
+  print('cyan', `📚 Hoy aprenderemos sobre: ${conversationState.selectedSession.name}`);
+  print('cyan', `🎯 Objetivo: ${conversationState.selectedSession.learning_objective}`);
+  print('cyan', `📋 Empezaremos con: ${primerMomento.momento}`);
+  print('cyan', '\n💬 ¡Escribe tu mensaje para comenzar la interacción!');
+}
+
+// Función para procesar mensajes del estudiante
+async function processStudentMessage(message) {
+  if (!conversationState.selectedCourse || !conversationState.selectedSession || !conversationState.currentSessionKey) {
+    print('red', '❌ Debes seleccionar un curso y sesión primero con /select');
+    return;
+  }
+
+  try {
+    print('cyan', `\n👤 Estudiante: ${message}`);
+
+    // Usar el método optimizado con fragmentos pre-calculados
+    const respuesta = await conversationState.vectorStoreExtractor.handleStudent(
+      conversationState.currentSessionKey, 
+      message
+    );
+
+    // Actualizar estado de la conversación
+    conversationState.momentoActual = respuesta.momentoActual;
+    conversationState.momentos = respuesta.momentos;
+
+    // Agregar mensajes al historial
+    conversationState.messages.push({
+      role: 'user',
+      content: message,
+      timestamp: new Date()
+    });
     conversationState.messages.push({
       role: 'assistant',
-      content: greeting
+      content: respuesta.respuesta,
+      timestamp: new Date()
     });
+
+    // Mostrar respuesta del docente
+    print('green', `\n📁 ${conversationState.selectedCourse.specialist_role}:`);
+    print('white', respuesta.respuesta);
+    print('cyan', `🚀 Progreso: ${respuesta.progreso}/${respuesta.total_momentos}`);
+    print('cyan', `📁 Momento actual: ${respuesta.momento_actual}`);
+    print('cyan', `📁 ${respuesta.razon_avance}`);
+    print('yellow', `⏭️ Siguiente: ${respuesta.siguiente_momento}`);
+
+  } catch (error) {
+    print('red', `❌ Error procesando mensaje: ${error.message}`);
   }
 }
 
-// Función para generar respuesta de la IA
-async function generateAIResponse(userMessage) {
-  // Agregar mensaje del usuario al historial
-  conversationState.messages.push({
-    role: 'user',
-    content: userMessage
-  });
+// Función para mostrar el progreso actual
+function showProgress() {
+  if (!conversationState.selectedCourse || !conversationState.selectedSession) {
+    print('red', '❌ No estás en una clase');
+    return;
+  }
+
+  const progress = ((conversationState.momentoActual + 1) / conversationState.momentos.length) * 100;
+  const currentMoment = conversationState.momentos[conversationState.momentoActual]?.momento || 'N/A';
   
-  // Usar función directa sin embeddings - el system prompt ya tiene todo el contexto
-  const response = await queryOpenAIDirect(conversationState.messages);
+  print('cyan', '\n📊 PROGRESO DE LA SESIÓN:');
+  print('white', `📁 Curso: ${conversationState.selectedCourse.name}`);
+  print('white', `📚 Sesión: ${conversationState.selectedSession.name}`);
+  print('white', `👨‍🏫 Especialista: ${conversationState.selectedCourse.specialist_role}`);
+  print('cyan', `\n📊 Progreso de la clase:`);
+  print('white', `   Curso: ${conversationState.selectedCourse.name}`);
+  print('white', `   Sesión: ${conversationState.selectedSession.name}`);
+  print('white', `   Progreso: ${conversationState.momentoActual + 1}/${conversationState.momentos.length} (${progress.toFixed(1)}%)`);
+  print('white', `   Momento actual: ${currentMoment}`);
+  print('white', `   Sesión activa: ${conversationState.currentSessionKey || 'N/A'}`);
   
-  // Avanzar al siguiente momento después de una respuesta exitosa
-  if (response && conversationState.momentosPersonalizados) {
-    conversationState.momentoActual++;
-    if (conversationState.momentoActual >= conversationState.momentosPersonalizados.length) {
-      print('green', '🎉 ¡Has completado todos los momentos de la sesión!');
-    }
+  // Mostrar estadísticas del sistema si hay extractor
+  if (conversationState.vectorStoreExtractor) {
+    const stats = conversationState.vectorStoreExtractor.getCacheStats();
+    print('cyan', `\n📊 ESTADÍSTICAS DEL SISTEMA:`);
+    print('white', `   🎓 Sesiones activas: ${stats.activeSessions}`);
+    print('white', `   💾 Cache: ${stats.cacheSize} elementos`);
+    print('white', `   🎓 Tamaño de sesiones: ${stats.sessionsSize}`);
+  } else {
+    print('red', '❌ No hay extractor inicializado');
   }
   
-  if (response) {
-    // Agregar respuesta de la IA al historial
-    conversationState.messages.push({
-      role: 'assistant',
-      content: response
-    });
+  if (conversationState.messages && conversationState.messages.length > 0) {
+    print('cyan', `\n💬 Mensajes intercambiados: ${conversationState.messages.length}`);
   }
-  
-  return response;
 }
 
 // Función para procesar comandos
 async function processCommand(input) {
   const parts = input.trim().split(' ');
-  const command = parts[0].toLowerCase();
+  const command = parts[0];
   
   switch (command) {
+    case '/select':
+      if (parts.length < 3) {
+        print('red', '❌ Uso: /select <courseId> <sessionNumber>');
+        print('yellow', '   Ejemplo: /select SSO001 1');
+        return;
+      }
+      const courseId = parts[1];
+      const sessionNumber = parseInt(parts[2]);
+      await selectCourse(courseId, sessionNumber);
+      break;
+      
+    case '/start':
+      if (!conversationState.selectedCourse || !conversationState.selectedSession) {
+        print('red', '❌ Debes seleccionar un curso y sesión primero con /select');
+        return;
+      }
+      conversationState.isInClass = true;
+      print('green', `💾 ¡Bienvenido a la clase de ${conversationState.selectedSession.name}!`);
+      print('cyan', `🧠 Docente IA especializado cargado`);
+      print('cyan', `📁 Contenido extraído del Vector Store`);
+      print('cyan', `⚡ Interfaz interactiva lista`);
+      print('cyan', `🔗🏫🏫 ¡Hola! Soy tu ${conversationState.selectedCourse.specialist_role}`);
+      print('cyan', `🚀 Hoy aprenderemos sobre: ${conversationState.selectedSession.name}`);
+      print('cyan', `🚀 Objetivo: ${conversationState.selectedSession.learning_objective}`);
+      print('cyan', `📁 Empezaremos con: ${conversationState.momentos[0]?.momento || 'N/A'}`);
+      print('cyan', `👤 ¡Escribe tu mensaje para comenzar la interacción!`);
+      break;
+      
+    case '/sessions':
+      if (conversationState.vectorStoreExtractor) {
+        const sessions = conversationState.vectorStoreExtractor.listActiveSessions();
+        if (sessions.length === 0) {
+          print('yellow', '📋 No hay sesiones activas');
+        } else {
+          print('cyan', '📋 Sesiones activas:');
+          sessions.forEach(session => {
+            print('white', `   ${session.sessionKey}: ${session.course} - ${session.session} (${session.progress})`);
+          });
+        }
+      } else {
+        print('red', '❌ No hay extractor inicializado');
+      }
+      break;
+
+    case '/clear-session':
+      if (parts.length < 2) {
+        print('red', '❌ Uso: /clear-session <sessionKey>');
+        return;
+      }
+      if (conversationState.vectorStoreExtractor) {
+        const sessionKey = parts[1];
+        const cleared = conversationState.vectorStoreExtractor.clearSession(sessionKey);
+        print(cleared ? 'green' : 'red', `✅ Sesión ${sessionKey} eliminada`);
+      }
+      break;
+
+    case '/clear-all-sessions':
+      if (conversationState.vectorStoreExtractor) {
+        conversationState.vectorStoreExtractor.clearAllSessions();
+        print('green', '✅ Todas las sesiones eliminadas');
+      }
+      break;
+      
+    case '/stats':
+      if (conversationState.vectorStoreExtractor) {
+        const stats = conversationState.vectorStoreExtractor.getCacheStats();
+        print('cyan', '\n📊 ESTADÍSTICAS DEL SISTEMA:');
+        print('white', `   🎓 Sesiones activas: ${stats.activeSessions}`);
+        print('white', `   💾 Tamaño del cache: ${stats.cacheSize}`);
+        print('white', `   🎓 Tamaño de sesiones: ${stats.sessionsSize}`);
+      } else {
+        print('red', '❌ No hay extractor inicializado');
+      }
+      break;
+      
+    case '/reset':
+      conversationState.selectedCourse = null;
+      conversationState.selectedSession = null;
+      conversationState.vectorStoreExtractor = null;
+      conversationState.currentSessionKey = null;
+      conversationState.momentoActual = 0;
+      conversationState.momentos = [];
+      conversationState.messages = [];
+      conversationState.isInClass = false;
+      print('green', '✅ Estado de conversación reiniciado');
+      break;
+      
     case '/help':
       showHelp();
       break;
       
-    case '/courses':
-      showCourses();
-      break;
-      
-    case '/select':
-      if (parts.length >= 3) {
-        const courseId = parts[1];
-        const sessionNumber = parseInt(parts[2]);
-        await selectCourse(courseId, sessionNumber);
-      } else {
-        print('red', '❌ Uso: /select <curso> <sesión>');
-      }
-      break;
-      
-    case '/start':
-      await startClass();
-      break;
-      
-    case '/clear':
-      conversationState.messages = [];
-      conversationState.isInClass = false;
-      conversationState.momentoActual = 0;
-      print('green', '✅ Estado de conversación limpiado');
-      break;
-      
-    case '/momentos':
-      if (conversationState.momentosPersonalizados) {
-        print('cyan', '\n📚 Momentos Personalizados:');
-        conversationState.momentosPersonalizados.forEach((momento, index) => {
-          const status = index === conversationState.momentoActual ? '🔄 ACTUAL' : 
-                        index < conversationState.momentoActual ? '✅ COMPLETADO' : '⏳ PENDIENTE';
-          print('white', `${index + 1}. ${momento.titulo} - ${status}`);
-        });
-        print('cyan', `\nProgreso: ${conversationState.momentoActual}/${conversationState.momentosPersonalizados.length} momentos`);
-      } else {
-        print('red', '❌ No hay momentos personalizados cargados');
-      }
-      break;
-      
-    case '/quit':
     case '/exit':
       print('yellow', '👋 ¡Hasta luego!');
       process.exit(0);
       break;
       
     default:
-      print('red', `❌ Comando no reconocido: ${command}`);
-      showHelp();
-      break;
+      print('red', `❌ Comando no reconocido. Usa /help para ver comandos disponibles.`);
   }
 }
 
 // Función para mostrar ayuda
 function showHelp() {
-  print('cyan', '\n📖 Comandos disponibles:');
-  print('white', '/help - Mostrar esta ayuda');
-  print('white', '/courses - Mostrar cursos disponibles');
-  print('white', '/select <curso> <sesión> - Seleccionar curso y sesión');
-  print('white', '/start - Iniciar la clase con momentos personalizados');
-  print('white', '/momentos - Ver progreso de momentos');
-  print('white', '/clear - Limpiar estado de conversación');
-  print('white', '/quit o /exit - Salir del chat');
-  print('yellow', '\n💡 Una vez iniciada la clase, simplemente escribe tus respuestas');
-  print('yellow', '🎯 El sistema seguirá automáticamente la secuencia de momentos personalizados');
-  print('yellow', '🧠 Personalidad pedagógica completa basada en "Teach Like a Champion"');
-  print('yellow', '📁 Contenido real de archivos de OpenAI por file_ID');
-  print('yellow', '⚡ Modo optimizado: Respuestas instantáneas sin generación de embeddings');
+  print('cyan', '\n📚 DOCENTEIA - COMANDOS DISPONIBLES:');
+  print('white', '\n🎯 SELECCIÓN Y CONTROL:');
+  print('yellow', '   /select <courseId> <sessionNumber>  - Seleccionar curso y sesión');
+  print('yellow', '   /start                              - Iniciar la clase interactiva');
+  print('yellow', '   /reset                              - Reiniciar estado de conversación');
+
+  print('white', '\n📋 GESTIÓN DE SESIONES:');
+  print('yellow', '   /sessions                           - Listar sesiones activas');
+  print('yellow', '   /clear-session <sessionKey>         - Eliminar sesión específica');
+  print('yellow', '   /clear-all-sessions                 - Eliminar todas las sesiones');
+
+  print('white', '\n📊 INFORMACIÓN:');
+  print('yellow', '   /progress                           - Mostrar progreso actual');
+  print('yellow', '   /stats                              - Estadísticas del sistema');
+  print('yellow', '   /help                               - Mostrar esta ayuda');
+
+  print('white', '\n💬 INTERACCIÓN:');
+  print('yellow', '   Escribe cualquier mensaje para interactuar con el docente IA');
+  print('yellow', '   El sistema avanzará automáticamente entre momentos según tu progreso');
+
+  print('cyan', '\n⚡ CARACTERÍSTICAS OPTIMIZADAS:');
+  print('white', '   • Fragmentos pre-calculados para respuestas más rápidas');
+  print('white', '   • Gestión inteligente de sesiones');
+  print('white', '   • Coordinación automática del avance de la clase');
+  print('white', '   • Cache optimizado para mejor rendimiento');
 }
 
 // Función principal del chat
-async function startChat() {
+function startChat() {
   // Crear interfaz de readline
   const rl = readline.createInterface({
     input: process.stdin,
@@ -497,7 +387,7 @@ async function startChat() {
     prompt: ''
   });
   
-  print('cyan', '🤖 Chat Terminal - DocenteIA v2.0');
+  print('cyan', '🤖 Chat Terminal - DocenteIA v2.0 (Integrado con VectorStore)');
   print('cyan', 'Escribe /help para ver comandos\n');
   
   // Mostrar cursos disponibles
@@ -520,19 +410,11 @@ async function startChat() {
         return;
       }
       
-      // Si estamos en clase, procesar como respuesta del estudiante
+      // Si estamos en clase, procesar como mensaje del estudiante
       if (conversationState.isInClass) {
-        print('yellow', '🔄 Generando respuesta del docente...');
-        
-        const aiResponse = await generateAIResponse(trimmedInput);
-        
-        if (aiResponse) {
-          print('cyan', `\n👨‍🏫 ${aiResponse}\n`);
-        } else {
-          print('red', '❌ Error generando respuesta');
-        }
+        await processStudentMessage(trimmedInput);
       } else {
-        print('yellow', '💡 Usa /start para iniciar una clase primero');
+        print('yellow', '💡 Usa /select para elegir un curso y sesión, luego /start para iniciar la clase');
       }
       
       askQuestion();
@@ -549,4 +431,4 @@ process.on('SIGINT', () => {
 });
 
 // Iniciar el chat
-startChat().catch(console.error);
+startChat();
