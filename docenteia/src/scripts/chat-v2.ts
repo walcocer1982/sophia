@@ -1,8 +1,12 @@
-const readline = require('readline');
-const fs = require('fs');
-const path = require('path');
-const VectorStoreExtractor = require('../lib/vector-store-extractor');
-require('dotenv').config({ path: path.join(__dirname, '../../.env.local') });
+import * as readline from 'readline';
+import * as fs from 'fs';
+import * as path from 'path';
+import { VectorStoreExtractor } from '../lib/VectorStoreExtractor';
+import { Course, Session, AIResponse } from '../types';
+import * as dotenv from 'dotenv';
+
+// Configurar variables de entorno
+dotenv.config({ path: path.join(__dirname, '../../.env.local') });
 
 // Colores para la terminal
 const colors = {
@@ -18,7 +22,22 @@ const colors = {
 };
 
 // Estado global de la conversación
-const conversationState = {
+interface ConversationState {
+  selectedCourse: Course | null;
+  selectedSession: Session | null;
+  vectorStoreExtractor: VectorStoreExtractor | null;
+  currentSessionKey: string | null;
+  momentoActual: number;
+  momentos: any[];
+  messages: Array<{
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: Date;
+  }>;
+  isInClass: boolean;
+}
+
+const conversationState: ConversationState = {
   selectedCourse: null,
   selectedSession: null,
   vectorStoreExtractor: null,
@@ -30,12 +49,12 @@ const conversationState = {
 };
 
 // Función para imprimir con colores
-function print(color, text) {
+function print(color: keyof typeof colors, text: string): void {
   console.log(`${colors[color]}${text}${colors.reset}`);
 }
 
 // Función para cargar la base de datos de cursos
-function loadCoursesDatabase() {
+function loadCoursesDatabase(): any {
   try {
     const filePath = path.join(__dirname, '../data/courses-database.json');
     const data = fs.readFileSync(filePath, 'utf8');
@@ -47,12 +66,12 @@ function loadCoursesDatabase() {
 }
 
 // Función para mostrar cursos disponibles
-function showCourses() {
+function showCourses(): void {
   const data = loadCoursesDatabase();
   if (!data || !data.courses) return;
   
   print('cyan', '\n📚 Cursos Disponibles:');
-  data.courses.forEach((course, index) => {
+  data.courses.forEach((course: Course, index: number) => {
     print('white', `${index + 1}. ${course.id} - ${course.name}`);
     print('yellow', `   👨‍🏫 ${course.specialist_role}`);
     print('yellow', `   📊 ${course.sessions.length} sesiones disponibles`);
@@ -62,31 +81,31 @@ function showCourses() {
 }
 
 // Función para seleccionar curso y sesión
-async function selectCourse(courseId, sessionNumber) {
+async function selectCourse(courseId: string, sessionNumber: number): Promise<void> {
   try {
     const sessionId = `sesion0${sessionNumber}`;
     
     // Cargar datos del curso desde la base de datos
-  const data = loadCoursesDatabase();
+    const data = loadCoursesDatabase();
     if (!data || !data.courses) {
       console.error('❌ No se pudo cargar la base de datos de cursos');
       return;
     }
   
-  const course = data.courses.find(c => c.id === courseId);
-  if (!course) {
+    const course = data.courses.find((c: Course) => c.id === courseId);
+    if (!course) {
       console.error(`❌ Curso ${courseId} no encontrado`);
       return;
-  }
+    }
   
-  // Validar que el número de sesión sea válido
-  if (sessionNumber < 1 || sessionNumber > course.sessions.length) {
+    // Validar que el número de sesión sea válido
+    if (sessionNumber < 1 || sessionNumber > course.sessions.length) {
       console.error(`❌ Sesión ${sessionNumber} no encontrada. Sesiones disponibles: 1-${course.sessions.length}`);
       return;
-  }
+    }
   
-  const session = course.sessions[sessionNumber - 1];
-  if (!session) {
+    const session = course.sessions[sessionNumber - 1];
+    if (!session) {
       console.error(`❌ Sesión ${sessionNumber} no encontrada`);
       return;
     }
@@ -122,46 +141,17 @@ async function selectCourse(courseId, sessionNumber) {
 
     console.log(`📄 Momentos extraídos: ${conversationState.momentos.length}`);
     console.log(`🔗 Estructura de la clase:`);
-    conversationState.momentos.forEach((momento, index) => {
+    conversationState.momentos.forEach((momento: any, index: number) => {
       console.log(`   ${index + 1}. ${momento.momento}`);
     });
 
   } catch (error) {
-    console.error(`❌ Error seleccionando curso: ${error.message}`);
+    console.error(`❌ Error seleccionando curso: ${error instanceof Error ? error.message : 'Error desconocido'}`);
   }
-}
-
-// Función para iniciar la clase
-function startClass() {
-  if (!conversationState.selectedCourse || !conversationState.selectedSession) {
-    print('red', '❌ Debes seleccionar un curso y sesión primero');
-    return;
-  }
-  
-  if (!conversationState.momentos || conversationState.momentos.length === 0) {
-    print('red', '❌ No hay momentos cargados. Usa /select primero');
-    return;
-  }
-  
-  conversationState.isInClass = true;
-  conversationState.messages = [];
-  conversationState.momentoActual = 0;
-  
-  print('green', `🎓 ¡Bienvenido a la clase de ${conversationState.selectedSession.name}!`);
-  print('cyan', '🧠 Docente IA especializado cargado');
-  print('cyan', '📁 Contenido extraído del Vector Store');
-  print('cyan', '⚡ Interfaz interactiva lista\n');
-  
-  const primerMomento = conversationState.momentos[0];
-  print('cyan', `👨‍🏫 ¡Hola! Soy tu ${conversationState.selectedCourse.specialist_role}`);
-  print('cyan', `📚 Hoy aprenderemos sobre: ${conversationState.selectedSession.name}`);
-  print('cyan', `🎯 Objetivo: ${conversationState.selectedSession.learning_objective}`);
-  print('cyan', `📋 Empezaremos con: ${primerMomento.momento}`);
-  print('cyan', '\n💬 ¡Escribe tu mensaje para comenzar la interacción!');
 }
 
 // Función para procesar mensajes del estudiante
-async function processStudentMessage(message) {
+async function processStudentMessage(message: string): Promise<void> {
   if (!conversationState.selectedCourse || !conversationState.selectedSession || !conversationState.currentSessionKey) {
     print('red', '❌ Debes seleccionar un curso y sesión primero con /select');
     return;
@@ -171,7 +161,7 @@ async function processStudentMessage(message) {
     print('cyan', `\n👤 Estudiante: ${message}`);
 
     // Usar el método optimizado con fragmentos pre-calculados
-    const respuesta = await conversationState.vectorStoreExtractor.handleStudent(
+    const respuesta = await conversationState.vectorStoreExtractor!.handleStudent(
       conversationState.currentSessionKey, 
       message
     );
@@ -201,12 +191,12 @@ async function processStudentMessage(message) {
     print('yellow', `⏭️ Siguiente: ${respuesta.siguiente_momento}`);
 
   } catch (error) {
-    print('red', `❌ Error procesando mensaje: ${error.message}`);
+    print('red', `❌ Error procesando mensaje: ${error instanceof Error ? error.message : 'Error desconocido'}`);
   }
 }
 
 // Función para mostrar el progreso actual
-function showProgress() {
+function showProgress(): void {
   if (!conversationState.selectedCourse || !conversationState.selectedSession) {
     print('red', '❌ No estás en una clase');
     return;
@@ -243,7 +233,7 @@ function showProgress() {
 }
 
 // Función para procesar comandos
-async function processCommand(input) {
+async function processCommand(input: string): Promise<void> {
   const parts = input.trim().split(' ');
   const command = parts[0];
   
@@ -350,7 +340,7 @@ async function processCommand(input) {
 }
 
 // Función para mostrar ayuda
-function showHelp() {
+function showHelp(): void {
   print('cyan', '\n📚 DOCENTEIA - COMANDOS DISPONIBLES:');
   print('white', '\n🎯 SELECCIÓN Y CONTROL:');
   print('yellow', '   /select <courseId> <sessionNumber>  - Seleccionar curso y sesión');
@@ -376,10 +366,12 @@ function showHelp() {
   print('white', '   • Gestión inteligente de sesiones');
   print('white', '   • Coordinación automática del avance de la clase');
   print('white', '   • Cache optimizado para mejor rendimiento');
+  print('white', '   • Control de costos en tiempo real');
+  print('white', '   • Selección dinámica de modelos');
 }
 
 // Función principal del chat
-function startChat() {
+function startChat(): void {
   // Crear interfaz de readline
   const rl = readline.createInterface({
     input: process.stdin,
@@ -387,7 +379,7 @@ function startChat() {
     prompt: ''
   });
   
-  print('cyan', '🤖 Chat Terminal - DocenteIA v2.0 (Integrado con VectorStore)');
+  print('cyan', '🤖 Chat Terminal - DocenteIA v3.0 (TypeScript + Optimizaciones)');
   print('cyan', 'Escribe /help para ver comandos\n');
   
   // Mostrar cursos disponibles
@@ -431,4 +423,4 @@ process.on('SIGINT', () => {
 });
 
 // Iniciar el chat
-startChat();
+startChat(); 
