@@ -2,7 +2,7 @@ import * as readline from 'readline';
 import * as fs from 'fs';
 import * as path from 'path';
 import { VectorStoreExtractor } from '../lib/VectorStoreExtractor';
-import { Course, Session, AIResponse } from '../types';
+import { Course, Session } from '../types';
 import * as dotenv from 'dotenv';
 
 // Configurar variables de entorno
@@ -167,8 +167,7 @@ async function processStudentMessage(message: string): Promise<void> {
     );
 
     // Actualizar estado de la conversación
-    conversationState.momentoActual = respuesta.momentoActual;
-    conversationState.momentos = respuesta.momentos;
+    conversationState.momentoActual = respuesta.progreso - 1; // Convertir progreso a índice
 
     // Agregar mensajes al historial
     conversationState.messages.push({
@@ -202,18 +201,10 @@ function showProgress(): void {
     return;
   }
 
-  const progress = ((conversationState.momentoActual + 1) / conversationState.momentos.length) * 100;
-  const currentMoment = conversationState.momentos[conversationState.momentoActual]?.momento || 'N/A';
-  
   print('cyan', '\n📊 PROGRESO DE LA SESIÓN:');
   print('white', `📁 Curso: ${conversationState.selectedCourse.name}`);
   print('white', `📚 Sesión: ${conversationState.selectedSession.name}`);
   print('white', `👨‍🏫 Especialista: ${conversationState.selectedCourse.specialist_role}`);
-  print('cyan', `\n📊 Progreso de la clase:`);
-  print('white', `   Curso: ${conversationState.selectedCourse.name}`);
-  print('white', `   Sesión: ${conversationState.selectedSession.name}`);
-  print('white', `   Progreso: ${conversationState.momentoActual + 1}/${conversationState.momentos.length} (${progress.toFixed(1)}%)`);
-  print('white', `   Momento actual: ${currentMoment}`);
   print('white', `   Sesión activa: ${conversationState.currentSessionKey || 'N/A'}`);
   
   // Mostrar estadísticas del sistema si hay extractor
@@ -262,7 +253,7 @@ async function processCommand(input: string): Promise<void> {
       print('cyan', `🔗🏫🏫 ¡Hola! Soy tu ${conversationState.selectedCourse.specialist_role}`);
       print('cyan', `🚀 Hoy aprenderemos sobre: ${conversationState.selectedSession.name}`);
       print('cyan', `🚀 Objetivo: ${conversationState.selectedSession.learning_objective}`);
-      print('cyan', `📁 Empezaremos con: ${conversationState.momentos[0]?.momento || 'N/A'}`);
+      print('cyan', `📁 Empezaremos con: MOMENTO_0`);
       print('cyan', `👤 ¡Escribe tu mensaje para comenzar la interacción!`);
       break;
       
@@ -299,6 +290,10 @@ async function processCommand(input: string): Promise<void> {
         conversationState.vectorStoreExtractor.clearAllSessions();
         print('green', '✅ Todas las sesiones eliminadas');
       }
+      break;
+      
+    case '/progress':
+      showProgress();
       break;
       
     case '/stats':
@@ -418,7 +413,7 @@ function startChat(): void {
 
 // Manejar señales de salida
 process.on('SIGINT', () => {
-  print('\n👋 ¡Hasta luego!');
+  print('green', '\n👋 ¡Hasta luego!');
   process.exit(0);
 });
 

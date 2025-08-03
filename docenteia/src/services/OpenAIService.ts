@@ -24,7 +24,7 @@ export class OpenAIService {
         instructions: params.systemPrompt,
         input: params.userPrompt,
         max_tokens: maxTokens,
-        response_format: { type: "json_object" },
+        text: { format: "json_object" },
         tools: params.vectorStoreIds ? [{
           type: "file_search",
           vector_store_ids: params.vectorStoreIds,

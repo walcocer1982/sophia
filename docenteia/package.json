@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "chat": "ts-node src/scripts/chat-v2.ts"
+    "chat": "tsc src/scripts/chat-v2.ts --outDir dist && node dist/scripts/chat-v2.js",
+    "chat:dev": "tsx src/scripts/chat-v2.ts"
   },
   "dependencies": {
     "@openai/agents": "^0.0.13",
@@ -32,7 +33,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.4.4",
     "flatrepo": "^1.2.0",
-    "ts-node": "^10.9.2",
+    "tsx": "^4.7.0",
     "typescript": "^5"
   }
 }
