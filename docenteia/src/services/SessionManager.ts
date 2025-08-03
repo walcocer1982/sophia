@@ -1,6 +1,6 @@
-import { SessionData, SessionInfo, CacheStats, Course, Session, Moment, Fragment } from '../types';
-import { OpenAIService } from './OpenAIService';
-import { PromptBuilder } from './PromptBuilder';
+import { SessionData, SessionInfo, CacheStats, Course, Session, Moment } from '../types';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export class SessionManager {
   private sessions = new Map<string, SessionData>();
@@ -8,7 +8,7 @@ export class SessionManager {
   private courseData: any;
 
   constructor() {
-    this.courseData = require('../data/courses-database.json');
+    this.courseData = JSON.parse(fs.readFileSync(path.join(__dirname, '../data/courses-database.json'), 'utf8'));
   }
 
   /**
@@ -188,19 +188,36 @@ export class SessionManager {
   }
 
   /**
-   * Valida contenido del tema
+   * Valida contenido del tema usando theme_keywords del JSON
    */
   validateContentTheme(fileId: string, expectedTheme: string, searchResults: any[]): any[] {
-    const themeKeywords = {
-      'IPERC': ['iperc', 'identificación', 'peligros', 'evaluación', 'riesgos', 'control'],
-      'Incendios': ['incendio', 'fuego', 'extintor', 'prevención', 'combustión', 'triángulo del fuego'],
-      'Seguridad': ['seguridad', 'prevención', 'riesgo', 'protección', 'accidente']
-    };
+    // Buscar la sesión que corresponde al fileId para obtener sus theme_keywords
+    let sessionKeywords: string[] = [];
+    
+    for (const course of this.courseData.courses) {
+      const session = course.sessions.find((s: Session) => s.file_id === fileId);
+      if (session && session.theme_keywords) {
+        sessionKeywords = session.theme_keywords;
+        break;
+      }
+    }
 
-    const keywords = themeKeywords[expectedTheme as keyof typeof themeKeywords] || [];
+    // Si no se encuentran keywords específicos, usar keywords genéricos basados en el tema
+    if (sessionKeywords.length === 0) {
+      const genericThemeKeywords = {
+        'IPERC': ['iperc', 'identificación', 'peligros', 'evaluación', 'riesgos', 'control'],
+        'Incendios': ['incendio', 'fuego', 'extintor', 'prevención', 'combustión', 'triángulo del fuego'],
+        'Seguridad': ['seguridad', 'prevención', 'riesgo', 'protección', 'accidente'],
+        'Perforación': ['perforación', 'equipo', 'componentes', 'técnicas', 'mantenimiento']
+      };
+      sessionKeywords = genericThemeKeywords[expectedTheme as keyof typeof genericThemeKeywords] || [];
+    }
+
+    console.log(`🔍 Validando contenido con keywords: ${sessionKeywords.join(', ')}`);
+
     const validResults = searchResults.filter(result => {
       const text = result.text.toLowerCase();
-      const matches = keywords.filter(keyword => text.includes(keyword.toLowerCase()));
+      const matches = sessionKeywords.filter(keyword => text.includes(keyword.toLowerCase()));
       return matches.length >= 1;
     });
 

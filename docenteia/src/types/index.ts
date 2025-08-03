@@ -14,6 +14,7 @@ export interface Session {
   file_name: string;
   learning_objective: string;
   key_points: string[];
+  theme_keywords: string[];
 }
 
 export interface Moment {

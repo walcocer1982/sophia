@@ -18,6 +18,17 @@
             "Diferencia entre peligro y riesgo en el contexto de SSO",
             "Relaciona la severidad y probabilidad para evaluar un riesgo",
             "Propone controles adecuados según el tipo de peligro identificado"
+          ],
+          "theme_keywords": [
+            "iperc",
+            "identificación",
+            "peligros",
+            "evaluación",
+            "riesgos",
+            "control",
+            "seguridad",
+            "prevención",
+            "accidente"
           ]
         },
         {
@@ -31,6 +42,17 @@
             "Aplica medidas de protección personal",
             "Reconoce señales y señalización de seguridad",
             "Implementa protocolos de emergencia"
+          ],
+          "theme_keywords": [
+            "procedimientos",
+            "seguridad",
+            "protección",
+            "personal",
+            "señales",
+            "señalización",
+            "protocolos",
+            "emergencia",
+            "medidas"
           ]
         },
         {
@@ -44,6 +66,17 @@
             "Identifica medidas preventivas para evitar incendios",
             "Aplica procedimientos de evacuación en caso de emergencia",
             "Utiliza correctamente equipos contra incendios"
+          ],
+          "theme_keywords": [
+            "incendio",
+            "fuego",
+            "extintor",
+            "prevención",
+            "combustión",
+            "triángulo del fuego",
+            "evacuación",
+            "emergencia",
+            "equipos"
           ]
         }
       ],
@@ -72,6 +105,16 @@
             "Identifica los componentes principales del equipo de perforación",
             "Explica la función de cada componente en el proceso",
             "Relaciona el funcionamiento de los componentes para lograr la perforación efectiva"
+          ],
+          "theme_keywords": [
+            "perforación",
+            "equipo",
+            "componentes",
+            "fundamentos",
+            "mecanismo",
+            "funcionamiento",
+            "aplicaciones",
+            "proceso"
           ]
         },
         {
@@ -85,6 +128,16 @@
             "Selecciona la técnica apropiada según el terreno",
             "Aplica procedimientos de seguridad en perforación",
             "Evalúa la eficiencia de la técnica utilizada"
+          ],
+          "theme_keywords": [
+            "técnicas",
+            "perforación",
+            "terreno",
+            "métodos",
+            "selección",
+            "eficiencia",
+            "procedimientos",
+            "seguridad"
           ]
         },
         {
@@ -98,6 +151,17 @@
             "Aplica procedimientos de mantenimiento preventivo",
             "Diagnostica problemas comunes en equipos de perforación",
             "Ejecuta mantenimiento correctivo básico"
+          ],
+          "theme_keywords": [
+            "mantenimiento",
+            "preventivo",
+            "correctivo",
+            "equipos",
+            "perforación",
+            "diagnóstico",
+            "componentes",
+            "procedimientos",
+            "problemas"
           ]
         }
       ],
