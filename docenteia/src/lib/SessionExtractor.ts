@@ -1,27 +1,23 @@
-import { SessionData, AIResponse, Moment, Fragment } from '../types';
+import { AIResponse, Moment } from '../types';
 import { OpenAIService } from '../services/OpenAIService';
 import { SessionManager } from '../services/SessionManager';
-import { VectorStoreService } from '../services/VectorStoreService';
 import { PromptBuilder } from '../services/PromptBuilder';
 
-export class VectorStoreExtractor {
+export class SessionExtractor {
   private openAIService: OpenAIService;
   private sessionManager: SessionManager;
-  private vectorStoreService: VectorStoreService;
 
   constructor() {
     this.openAIService = new OpenAIService(process.env.OPENAI_API_KEY!);
     this.sessionManager = new SessionManager();
-    this.vectorStoreService = new VectorStoreService(this.openAIService, this.sessionManager);
   }
 
   /**
-   * Inicia una sesión optimizada con fragmentos pre-calculados
+   * Inicia una sesión cargando JSON directamente
    */
   async startSession(courseId: string, sessionId: string): Promise<{
     sessionKey: string;
     momentos: number;
-    fragmentos: number;
     currentMoment: string;
   }> {
     try {
@@ -33,60 +29,25 @@ export class VectorStoreExtractor {
         throw new Error('Error iniciando sesión');
       }
 
-      console.log(`🚀 Iniciando sesión optimizada: ${session.course.name} - ${session.session.name}`);
-      console.log(`📁 Vector Store: ${session.vectorStoreId}`);
-      console.log(`📁 Archivo: ${session.fileName} (${session.fileId})`);
+      console.log(`🚀 Iniciando sesión: ${session.course.name} - ${session.session.name}`);
+      console.log(`📁 Archivo: ${session.sessionFile}`);
 
-      // Verificar que el archivo existe en el vector store
-      await this.vectorStoreService.validateFileExists(session.vectorStoreId, session.fileId);
-      console.log(`✅ Archivo ${session.fileId} validado en vector store`);
-
-      console.log(`🎯 Tema esperado: ${session.expectedTheme}`);
-
-      // Extraer momentos con precisión
-      const momentos = await this.vectorStoreService.extractMomentosWithPrecision(
-        session.vectorStoreId,
-        session.fileId,
-        session.fileName,
-        session.course,
-        session.session,
-        session.expectedTheme
-      );
-      
-      console.log(`✅ Momentos validados para tema ${session.expectedTheme}`);
-
-      // Pre-calcular fragmentos para cada momento (OPTIMIZACIÓN FASE 1)
-      const fragmentos = await this.vectorStoreService.preCalculateFragmentos(
-        session.vectorStoreId,
-        momentos,
-        session.expectedTheme
-      );
-
-      // Actualizar sesión con momentos y fragmentos
-      this.sessionManager.updateSession(sessionKey, {
-        momentos,
-        fragmentos,
-        currentMomentIndex: 0
-      });
-
-      console.log(`✅ Sesión iniciada: ${momentos.length} momentos, ${fragmentos.length} fragmentos`);
-      console.log(`💾 Estado guardado con clave: ${sessionKey}`);
+      console.log(`✅ Sesión iniciada: ${session.momentos.length} momentos`);
 
       return {
         sessionKey,
-        momentos: momentos.length,
-        fragmentos: fragmentos.length,
-        currentMoment: momentos[0]?.momento || 'N/A'
+        momentos: session.momentos.length,
+        currentMoment: session.momentos[0]?.momento || 'N/A'
       };
 
     } catch (error) {
-      console.error('Error iniciando sesión optimizada:', error);
+      console.error('Error iniciando sesión:', error);
       throw error;
     }
   }
 
   /**
-   * Maneja la interacción del estudiante usando fragmentos pre-calculados
+   * Maneja la interacción del estudiante usando contenido del JSON con memoria conversacional
    */
   async handleStudent(sessionKey: string, studentMessage: string): Promise<AIResponse> {
     try {
@@ -98,15 +59,25 @@ export class VectorStoreExtractor {
       // Actualizar última actividad
       this.sessionManager.updateSession(sessionKey, { lastActivity: new Date() });
 
-      console.log(`🎓 ${session.course.specialist_role} respondiendo en ${session.session.name}`);
-      console.log(`📊 Progreso: Momento ${session.currentMomentIndex + 1}/${session.momentos.length}`);
+      console.log(`🎓 ${session.course.specialist_role} respondiendo...`);
 
-      // Obtener el momento actual y fragmentos pre-calculados
+      // Guardar mensaje del estudiante en la memoria conversacional
+      session.conversationLog.push({
+        role: 'user',
+        content: studentMessage,
+        timestamp: new Date()
+      });
+
+      // Obtener el momento actual
       const momentoActual = session.momentos[session.currentMomentIndex] || null;
-      const fragmentosActuales = session.fragmentos.filter(f => 
-        f.texto.includes(momentoActual?.momento || '')
-      );
       const siguienteMomento = session.momentos[session.currentMomentIndex + 1] || null;
+
+      // Construir historial de conversación (últimas 6 interacciones para no saturar tokens)
+      const MAX_HISTORIA = 6;
+      const historialRecortado = session.conversationLog
+        .slice(-MAX_HISTORIA)
+        .map(m => `${m.role === 'user' ? 'Estudiante' : 'Docente'}: "${m.content}"`)
+        .join('\n');
 
       // Construir prompts optimizados
       const systemPrompt = PromptBuilder.buildSystemPrompt({
@@ -116,21 +87,41 @@ export class VectorStoreExtractor {
         learningObjective: session.session.learning_objective,
         keyPoints: session.session.key_points,
         momentos: session.momentos,
-        currentIndex: session.currentMomentIndex,
-        fragmentos: fragmentosActuales
+        currentIndex: session.currentMomentIndex
       });
 
-      const userPrompt = PromptBuilder.buildUserPrompt(studentMessage, {
-        currentMoment: momentoActual ? momentoActual.momento : 'N/A',
-        progress: `${session.currentMomentIndex + 1}/${session.momentos.length}`
-      });
+
+
+      // Preparar mensajes para OpenAI
+      let finalSystemPrompt = '';
+      
+      // Si es el primer turno, enviar el mensaje de "espíritu"
+      if (session.isFirstTurn) {
+        const spiritPrompt = PromptBuilder.buildSpiritPrompt({
+          specialistRole: session.course.specialist_role,
+          sessionName: session.session.name,
+          courseName: session.course.name,
+          learningObjective: session.session.learning_objective
+        });
+        finalSystemPrompt += spiritPrompt + '\n\n';
+        
+        // Marcar que ya no es el primer turno
+        this.sessionManager.updateSession(sessionKey, { isFirstTurn: false });
+      }
+
+      // Agregar historial de conversación si existe
+      if (historialRecortado.trim()) {
+        finalSystemPrompt += `HISTORIAL RECIENTE DE LA CLASE:\n${historialRecortado}\n\n[Si ya hiciste esa pregunta, dilo claramente y continúa con la siguiente.]\n\n`;
+      }
+
+      // Agregar el prompt del sistema
+      finalSystemPrompt += systemPrompt;
 
       // Llamar a OpenAI con parámetros optimizados
       const { response, metrics } = await this.openAIService.callOpenAI({
-        systemPrompt,
-        userPrompt,
-        vectorStoreIds: [session.vectorStoreId],
-        maxResults: 3
+        systemPrompt: finalSystemPrompt,
+        userPrompt: studentMessage,
+        model: 'gpt-3.5-turbo'  // Usar gpt-3.5-turbo para interacciones
       });
 
       // Registrar costo de la sesión
@@ -153,6 +144,13 @@ export class VectorStoreExtractor {
         };
       }
 
+      // Guardar respuesta del docente en la memoria conversacional
+      session.conversationLog.push({
+        role: 'assistant',
+        content: parsedResponse.respuesta,
+        timestamp: new Date()
+      });
+
       // Actualizar progreso si debe avanzar
       if (parsedResponse.debe_avanzar && session.currentMomentIndex < session.momentos.length - 1) {
         this.sessionManager.updateSession(sessionKey, {
@@ -165,13 +163,12 @@ export class VectorStoreExtractor {
 
       return {
         ...parsedResponse,
-        momentoActual: session.currentMomentIndex,
         momentos: session.momentos,
         sessionKey
       };
 
     } catch (error) {
-      console.error('Error en respuesta del docente especializado:', error);
+      console.error('Error en respuesta del docente:', error);
       return {
         respuesta: "Lo siento, tuve un problema generando la respuesta. ¿Podrías reformular tu pregunta?",
         momento_actual: 'ERROR',
@@ -180,7 +177,6 @@ export class VectorStoreExtractor {
         debe_avanzar: false,
         razon_avance: "Error en el sistema",
         siguiente_momento: 'ERROR',
-        momentoActual: 0,
         momentos: [],
         sessionKey
       };
@@ -188,7 +184,7 @@ export class VectorStoreExtractor {
   }
 
   /**
-   * Recoge los momentos del file_id con su vector store (MÉTODO LEGACY - mantiene compatibilidad)
+   * Recoge los momentos del archivo JSON (MÉTODO LEGACY - mantiene compatibilidad)
    */
   async getMomentosDelArchivo(courseId: string, sessionId: string): Promise<Moment[]> {
     try {
@@ -202,44 +198,6 @@ export class VectorStoreExtractor {
     } catch (error) {
       console.error('Error recogiendo momentos del archivo:', error);
       return [];
-    }
-  }
-
-  /**
-   * El modelo actúa como docente especializado siguiendo los momentos (MÉTODO LEGACY - mantiene compatibilidad)
-   */
-  async docenteEspecializadoResponde(
-    courseId: string, 
-    sessionId: string, 
-    userMessage: string, 
-    momentos: Moment[], 
-    momentoActual: number
-  ): Promise<AIResponse> {
-    try {
-      // Buscar sesión activa
-      const sessionKey = `${courseId}-${sessionId}`;
-      const session = this.sessionManager.getSession(sessionKey);
-      
-      if (!session) {
-        // Si no hay sesión activa, iniciar una nueva
-        await this.startSession(courseId, sessionId);
-      }
-      
-      // Usar el método optimizado
-      return await this.handleStudent(sessionKey, userMessage);
-    } catch (error) {
-      console.error('Error en respuesta del docente especializado:', error);
-      return {
-        respuesta: "Lo siento, tuve un problema generando la respuesta. ¿Podrías reformular tu pregunta?",
-        momento_actual: 'ERROR',
-        progreso: momentoActual + 1,
-        total_momentos: momentos.length,
-        debe_avanzar: false,
-        razon_avance: "Error en el sistema",
-        siguiente_momento: 'ERROR',
-        momentoActual: momentoActual,
-        momentos: momentos
-      };
     }
   }
 

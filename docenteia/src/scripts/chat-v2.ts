@@ -1,7 +1,7 @@
 import * as readline from 'readline';
 import * as fs from 'fs';
 import * as path from 'path';
-import { VectorStoreExtractor } from '../lib/VectorStoreExtractor';
+import { SessionExtractor } from '../lib/SessionExtractor';
 import { Course, Session } from '../types';
 import * as dotenv from 'dotenv';
 
@@ -25,7 +25,7 @@ const colors = {
 interface ConversationState {
   selectedCourse: Course | null;
   selectedSession: Session | null;
-  vectorStoreExtractor: VectorStoreExtractor | null;
+  sessionExtractor: SessionExtractor | null;
   currentSessionKey: string | null;
   momentoActual: number;
   momentos: any[];
@@ -40,7 +40,7 @@ interface ConversationState {
 const conversationState: ConversationState = {
   selectedCourse: null,
   selectedSession: null,
-  vectorStoreExtractor: null,
+  sessionExtractor: null,
   currentSessionKey: null,
   momentoActual: 0,
   momentos: [],
@@ -118,25 +118,23 @@ async function selectCourse(courseId: string, sessionNumber: number): Promise<vo
     console.log(`✅ Sesión seleccionada: ${session.name}`);
     console.log(`✅ Especialista: ${course.specialist_role}`);
     console.log(`✅ Objetivo: ${session.learning_objective}`);
-    console.log(`📁 File ID: ${session.file_id}`);
-    console.log(`📄 Archivo: ${session.file_name}`);
-    console.log(`🔗 Vector Store ID: ${course.vector_store_id}`);
+    console.log(`📁 Archivo de sesión: ${courseId}_${sessionId}.json`);
 
-    // Inicializar el extractor optimizado
-    conversationState.vectorStoreExtractor = new VectorStoreExtractor();
+    // Inicializar el extractor simplificado
+    conversationState.sessionExtractor = new SessionExtractor();
     
-    console.log(`🚀 Iniciando sesión optimizada...`);
+    console.log(`🚀 Iniciando sesión...`);
     
-    // Iniciar sesión optimizada con fragmentos pre-calculados
-    const sessionInfo = await conversationState.vectorStoreExtractor.startSession(courseId, sessionId);
+    // Iniciar sesión cargando JSON directamente
+    const sessionInfo = await conversationState.sessionExtractor.startSession(courseId, sessionId);
     conversationState.currentSessionKey = sessionInfo.sessionKey;
     
-    console.log(`✅ Sesión iniciada: ${sessionInfo.momentos} momentos, ${sessionInfo.fragmentos} fragmentos`);
+    console.log(`✅ Sesión iniciada: ${sessionInfo.momentos} momentos`);
     console.log(`✅ Clave de sesión: ${sessionInfo.sessionKey}`);
     console.log(`✅ Momento actual: ${sessionInfo.currentMoment}`);
 
     // Obtener momentos para mostrar estructura
-    conversationState.momentos = await conversationState.vectorStoreExtractor.getMomentosDelArchivo(courseId, sessionId);
+    conversationState.momentos = await conversationState.sessionExtractor.getMomentosDelArchivo(courseId, sessionId);
     conversationState.momentoActual = 0;
 
     console.log(`📄 Momentos extraídos: ${conversationState.momentos.length}`);
@@ -160,8 +158,8 @@ async function processStudentMessage(message: string): Promise<void> {
   try {
     print('cyan', `\n👤 Estudiante: ${message}`);
 
-    // Usar el método optimizado con fragmentos pre-calculados
-    const respuesta = await conversationState.vectorStoreExtractor!.handleStudent(
+    // Usar el método simplificado
+    const respuesta = await conversationState.sessionExtractor!.handleStudent(
       conversationState.currentSessionKey, 
       message
     );
@@ -208,8 +206,8 @@ function showProgress(): void {
   print('white', `   Sesión activa: ${conversationState.currentSessionKey || 'N/A'}`);
   
   // Mostrar estadísticas del sistema si hay extractor
-  if (conversationState.vectorStoreExtractor) {
-    const stats = conversationState.vectorStoreExtractor.getCacheStats();
+  if (conversationState.sessionExtractor) {
+    const stats = conversationState.sessionExtractor.getCacheStats();
     print('cyan', `\n📊 ESTADÍSTICAS DEL SISTEMA:`);
     print('white', `   🎓 Sesiones activas: ${stats.activeSessions}`);
     print('white', `   💾 Cache: ${stats.cacheSize} elementos`);
@@ -248,7 +246,7 @@ async function processCommand(input: string): Promise<void> {
       conversationState.isInClass = true;
       print('green', `💾 ¡Bienvenido a la clase de ${conversationState.selectedSession.name}!`);
       print('cyan', `🧠 Docente IA especializado cargado`);
-      print('cyan', `📁 Contenido extraído del Vector Store`);
+      print('cyan', `📁 Contenido cargado desde archivo JSON`);
       print('cyan', `⚡ Interfaz interactiva lista`);
       print('cyan', `🔗🏫🏫 ¡Hola! Soy tu ${conversationState.selectedCourse.specialist_role}`);
       print('cyan', `🚀 Hoy aprenderemos sobre: ${conversationState.selectedSession.name}`);
@@ -258,8 +256,8 @@ async function processCommand(input: string): Promise<void> {
       break;
       
     case '/sessions':
-      if (conversationState.vectorStoreExtractor) {
-        const sessions = conversationState.vectorStoreExtractor.listActiveSessions();
+          if (conversationState.sessionExtractor) {
+      const sessions = conversationState.sessionExtractor.listActiveSessions();
         if (sessions.length === 0) {
           print('yellow', '📋 No hay sesiones activas');
         } else {
@@ -278,16 +276,16 @@ async function processCommand(input: string): Promise<void> {
         print('red', '❌ Uso: /clear-session <sessionKey>');
         return;
       }
-      if (conversationState.vectorStoreExtractor) {
+      if (conversationState.sessionExtractor) {
         const sessionKey = parts[1];
-        const cleared = conversationState.vectorStoreExtractor.clearSession(sessionKey);
+        const cleared = conversationState.sessionExtractor.clearSession(sessionKey);
         print(cleared ? 'green' : 'red', `✅ Sesión ${sessionKey} eliminada`);
       }
       break;
 
     case '/clear-all-sessions':
-      if (conversationState.vectorStoreExtractor) {
-        conversationState.vectorStoreExtractor.clearAllSessions();
+      if (conversationState.sessionExtractor) {
+        conversationState.sessionExtractor.clearAllSessions();
         print('green', '✅ Todas las sesiones eliminadas');
       }
       break;
@@ -297,8 +295,8 @@ async function processCommand(input: string): Promise<void> {
       break;
       
     case '/stats':
-      if (conversationState.vectorStoreExtractor) {
-        const stats = conversationState.vectorStoreExtractor.getCacheStats();
+      if (conversationState.sessionExtractor) {
+        const stats = conversationState.sessionExtractor.getCacheStats();
         print('cyan', '\n📊 ESTADÍSTICAS DEL SISTEMA:');
         print('white', `   🎓 Sesiones activas: ${stats.activeSessions}`);
         print('white', `   💾 Tamaño del cache: ${stats.cacheSize}`);
@@ -311,7 +309,7 @@ async function processCommand(input: string): Promise<void> {
     case '/reset':
       conversationState.selectedCourse = null;
       conversationState.selectedSession = null;
-      conversationState.vectorStoreExtractor = null;
+      conversationState.sessionExtractor = null;
       conversationState.currentSessionKey = null;
       conversationState.momentoActual = 0;
       conversationState.momentos = [];

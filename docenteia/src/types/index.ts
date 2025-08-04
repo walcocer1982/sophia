@@ -3,15 +3,12 @@ export interface Course {
   id: string;
   name: string;
   specialist_role: string;
-  vector_store_id: string;
   sessions: Session[];
 }
 
 export interface Session {
   id: string;
   name: string;
-  file_id: string;
-  file_name: string;
   learning_objective: string;
   key_points: string[];
   theme_keywords: string[];
@@ -19,29 +16,27 @@ export interface Session {
 
 export interface Moment {
   momento: string;
-  texto: string;
-  file_id: string;
-}
-
-export interface Fragment {
-  texto: string;
-  score: number;
+  instrucciones_docenteia?: string;
+  contenido_tecnico?: string[];
+  historia?: string;
+  caso?: string;
+  preguntas?: string[];
 }
 
 export interface SessionData {
   courseId: string;
   sessionId: string;
-  vectorStoreId: string;
-  fileId: string;
-  fileName: string;
+  sessionFile: string;
   course: Course;
   session: Session;
   expectedTheme: string;
   momentos: Moment[];
-  fragmentos: Fragment[];
   currentMomentIndex: number;
   startTime: Date;
   lastActivity: Date;
+  sessionContent?: any; // Contenido completo de la sesión desde JSON
+  conversationLog: Array<{ role: 'user' | 'assistant'; content: string; timestamp: Date }>; // Memoria conversacional
+  isFirstTurn: boolean; // Para enviar el mensaje de "espíritu" solo una vez
 }
 
 export interface AIResponse {
@@ -52,6 +47,8 @@ export interface AIResponse {
   debe_avanzar: boolean;
   razon_avance: string;
   siguiente_momento: string;
+  momentos?: Moment[];
+  sessionKey?: string;
 }
 
 export interface CostMetrics {
@@ -86,7 +83,6 @@ export interface PromptParams {
   keyPoints: string[];
   momentos: Moment[];
   currentIndex: number;
-  fragmentos: Fragment[];
 }
 
 export interface UserPromptContext {
@@ -99,8 +95,6 @@ export interface OpenAICallParams {
   userPrompt: string;
   model?: string;
   maxTokens?: number;
-  vectorStoreIds?: string[];
-  maxResults?: number;
 }
 
 export interface OpenAICallResult {
@@ -108,16 +102,4 @@ export interface OpenAICallResult {
   metrics: CostMetrics;
 }
 
-export interface VectorStoreSearchParams {
-  vectorStoreId: string;
-  query: string;
-  maxResults?: number;
-}
-
-export interface CourseSessionInfo {
-  course: Course;
-  session: Session;
-  vectorStoreId: string;
-  fileId: string;
-  fileName: string;
-} 
+ 

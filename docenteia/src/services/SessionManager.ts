@@ -12,7 +12,7 @@ export class SessionManager {
   }
 
   /**
-   * Inicia una sesión optimizada
+   * Inicia una sesión cargando JSON directamente
    */
   async startSession(courseId: string, sessionId: string): Promise<string> {
     const sessionKey = `${courseId}-${sessionId}`;
@@ -26,7 +26,10 @@ export class SessionManager {
     console.log(`🚀 Iniciando nueva sesión: ${sessionKey}`);
     
     // Obtener información del curso y sesión
-    const { course, session, vectorStoreId, fileId, fileName } = this.getCourseSessionInfo(courseId, sessionId);
+    const { course, session } = this.getCourseSessionInfo(courseId, sessionId);
+    
+    // Cargar contenido de la sesión desde JSON
+    const sessionContent = this.loadSessionContent(courseId, sessionId);
     
     // Extraer tema esperado
     const expectedTheme = this.extractThemeFromSession(session.name);
@@ -35,17 +38,17 @@ export class SessionManager {
     const sessionData: SessionData = {
       courseId,
       sessionId,
-      vectorStoreId,
-      fileId,
-      fileName,
+      sessionFile: `${courseId}_${sessionId}.json`,
       course,
       session,
       expectedTheme,
-      momentos: [],
-      fragmentos: [],
+      momentos: sessionContent.momentos || [],
       currentMomentIndex: 0,
       startTime: new Date(),
-      lastActivity: new Date()
+      lastActivity: new Date(),
+      sessionContent, // Agregar contenido completo de la sesión
+      conversationLog: [], // Inicializar memoria conversacional vacía
+      isFirstTurn: true // Marcar como primer turno para enviar el "espíritu"
     };
 
     this.sessions.set(sessionKey, sessionData);
@@ -59,9 +62,6 @@ export class SessionManager {
   getCourseSessionInfo(courseId: string, sessionId: string): {
     course: Course;
     session: Session;
-    vectorStoreId: string;
-    fileId: string;
-    fileName: string;
   } {
     const course = this.courseData.courses.find((c: Course) => c.id === courseId);
     if (!course) {
@@ -75,10 +75,84 @@ export class SessionManager {
 
     return {
       course,
-      session,
-      vectorStoreId: course.vector_store_id,
-      fileId: session.file_id,
-      fileName: session.file_name
+      session
+    };
+  }
+
+  /**
+   * Carga el contenido de la sesión desde JSON
+   */
+  private loadSessionContent(courseId: string, sessionId: string): any {
+    try {
+      const fileName = `${courseId}_${sessionId}.json`;
+      
+      // Intentar múltiples rutas posibles
+      const possiblePaths = [
+        path.join(__dirname, '../data/sessions', fileName),
+        path.join(__dirname, '../../data/sessions', fileName),
+        path.join(__dirname, '../../../data/sessions', fileName)
+      ];
+      
+      let filePath: string | null = null;
+      for (const testPath of possiblePaths) {
+        if (fs.existsSync(testPath)) {
+          filePath = testPath;
+          break;
+        }
+      }
+      
+      if (!filePath) {
+        console.log(`⚠️ Archivo no encontrado en rutas: ${possiblePaths.join(', ')}`);
+        console.log(`📁 Usando contenido básico para: ${fileName}`);
+        return this.createBasicSessionContent();
+      }
+      
+      const content = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      console.log(`✅ Contenido cargado desde: ${filePath}`);
+      return content;
+    } catch (error) {
+      console.error(`❌ Error cargando contenido de sesión: ${error}`);
+      return this.createBasicSessionContent();
+    }
+  }
+
+  /**
+   * Crea contenido básico de sesión si no existe el archivo
+   */
+  private createBasicSessionContent(): any {
+    return {
+      momentos: [
+        {
+          momento: "Saludo (exposición del aprendizaje esperado y los puntos clave)",
+          instrucciones_docenteia: "Presentar el objetivo de la sesión y los puntos clave a desarrollar",
+          preguntas: ["¿Qué sabes sobre este tema?", "¿Qué esperas aprender hoy?"]
+        },
+        {
+          momento: "Conexión",
+          instrucciones_docenteia: "Narrar una historia o situación para conectar con experiencias previas",
+          preguntas: ["¿Qué observas en esta situación?", "¿Cómo se relaciona con tu experiencia?"]
+        },
+        {
+          momento: "Adquisición",
+          instrucciones_docenteia: "Explicar los conceptos técnicos principales",
+          preguntas: ["¿Qué conceptos nuevos identificas?", "¿Cómo se conectan con lo que ya sabías?"]
+        },
+        {
+          momento: "Aplicación",
+          instrucciones_docenteia: "Presentar un caso práctico para aplicar los conocimientos",
+          preguntas: ["¿Cómo aplicarías estos conceptos?", "¿Qué pasos seguirías?"]
+        },
+        {
+          momento: "Discusión",
+          instrucciones_docenteia: "Facilitar la comparación y discusión de diferentes enfoques",
+          preguntas: ["¿Qué opinas sobre este enfoque?", "¿Hay otras alternativas?"]
+        },
+        {
+          momento: "Reflexión",
+          instrucciones_docenteia: "Guiar la reflexión sobre lo aprendido y su aplicación práctica",
+          preguntas: ["¿Qué aprendiste hoy?", "¿Cómo aplicarás estos conocimientos?"]
+        }
+      ]
     };
   }
 
@@ -185,42 +259,5 @@ export class SessionManager {
     if (!momentos || momentos.length === 0) {
       throw new Error(`No se encontraron momentos válidos para el tema ${expectedTheme}`);
     }
-  }
-
-  /**
-   * Valida contenido del tema usando theme_keywords del JSON
-   */
-  validateContentTheme(fileId: string, expectedTheme: string, searchResults: any[]): any[] {
-    // Buscar la sesión que corresponde al fileId para obtener sus theme_keywords
-    let sessionKeywords: string[] = [];
-    
-    for (const course of this.courseData.courses) {
-      const session = course.sessions.find((s: Session) => s.file_id === fileId);
-      if (session && session.theme_keywords) {
-        sessionKeywords = session.theme_keywords;
-        break;
-      }
-    }
-
-    // Si no se encuentran keywords específicos, usar keywords genéricos basados en el tema
-    if (sessionKeywords.length === 0) {
-      const genericThemeKeywords = {
-        'IPERC': ['iperc', 'identificación', 'peligros', 'evaluación', 'riesgos', 'control'],
-        'Incendios': ['incendio', 'fuego', 'extintor', 'prevención', 'combustión', 'triángulo del fuego'],
-        'Seguridad': ['seguridad', 'prevención', 'riesgo', 'protección', 'accidente'],
-        'Perforación': ['perforación', 'equipo', 'componentes', 'técnicas', 'mantenimiento']
-      };
-      sessionKeywords = genericThemeKeywords[expectedTheme as keyof typeof genericThemeKeywords] || [];
-    }
-
-    console.log(`🔍 Validando contenido con keywords: ${sessionKeywords.join(', ')}`);
-
-    const validResults = searchResults.filter(result => {
-      const text = result.text.toLowerCase();
-      const matches = sessionKeywords.filter(keyword => text.includes(keyword.toLowerCase()));
-      return matches.length >= 1;
-    });
-
-    return validResults.length > 0 ? validResults : searchResults.slice(0, 3);
   }
 } 

@@ -1,6 +1,33 @@
-import { PromptParams, UserPromptContext, Moment } from '../types';
+import { PromptParams, UserPromptContext } from '../types';
 
 export class PromptBuilder {
+  /**
+   * Mensaje de "espíritu" que se envía solo al inicio de la sesión
+   */
+  static buildSpiritPrompt(params: { specialistRole: string; sessionName: string; courseName: string; learningObjective: string }): string {
+    return `Eres un **${params.specialistRole}** que imparte la sesión **"${params.sessionName}"** del curso **"${params.courseName}"**.
+
+🧭 PROPÓSITO PEDAGÓGICO:
+Tu misión es que el estudiante:
+- **Comprenda y aplique** los conceptos clave de esta sesión
+- **Relacione la teoría** con ejemplos concretos y casos prácticos
+- **Desarrolle habilidades** que pueda aplicar en situaciones reales
+- **Al final de la sesión** sea capaz de demostrar lo aprendido
+
+OBJETIVO DE APRENDIZAJE:
+${params.learningObjective}
+
+📋 TU ROL COMO DOCENTE:
+- Actúas como si siguieras un **guion pedagógico estricto**
+- **NO improvises** preguntas ni te saltes pasos
+- Usa un tono **cercano, claro y docente**
+- Construye conocimiento **inductivamente**
+- Valida y corrige respuestas **constructivamente**
+- **NO des definiciones directas** - guía al descubrimiento
+
+✋ Espera a que empiece el turno del estudiante antes de preguntar cualquier cosa.`.trim();
+  }
+
   private static readonly BASE_PROMPT = `Eres un especialista docente que usa metodología "Teach Like a Champion".
 
 PERSONALIDAD PEDAGÓGICA:
@@ -18,81 +45,173 @@ TU TAREA COMO DOCENTE:
 5. Proporcionar retroalimentación constructiva`;
 
   /**
-   * Construye el prompt del sistema optimizado
+   * Obtiene el contenido apropiado del momento según su tipo
+   */
+    private static getMomentoContent(momento: any): string {
+    if (!momento) return 'N/A';
+
+    const momentoName = momento.momento?.toLowerCase() || '';
+
+    // Para Conexión, mostrar la historia
+    if (momentoName.includes('conexión') && momento.historia) {
+      return `HISTORIA: ${momento.historia}`;
+    }
+
+    // Para Adquisición, mostrar el contenido técnico
+    if (momentoName.includes('adquisición') && momento.contenido_tecnico) {
+      const contenido = Array.isArray(momento.contenido_tecnico)
+        ? momento.contenido_tecnico.join('\n')
+        : momento.contenido_tecnico;
+      return `CONTENIDO TÉCNICO:\n${contenido}`;
+    }
+
+    // Para Aplicación, mostrar el caso
+    if (momentoName.includes('aplicación') && momento.caso) {
+      return `CASO PRÁCTICO: ${momento.caso}`;
+    }
+
+    // Para otros momentos, mostrar las instrucciones
+    // Algunos archivos usan clave con espacio, otros con guion bajo
+    const instruccionesDocente = (momento as any)["instrucciones docenteia"] 
+      ?? momento.instrucciones_docenteia;
+    
+    if (typeof instruccionesDocente === 'string' && instruccionesDocente.trim().length > 0) {
+      return `INSTRUCCIONES: ${instruccionesDocente}`;
+    }
+
+    return 'N/A';
+  }
+
+  /**
+   * Construye el prompt del sistema optimizado con guion específico por momento
    */
   static buildSystemPrompt(params: PromptParams): string {
-    const momentosContext = params.momentos.map((m, idx) => {
-      const estado = idx < params.currentIndex ? 'COMPLETADO' : 
-                    (idx === params.currentIndex ? 'ACTUAL' : 'PENDIENTE');
-      return `${idx + 1}. ${m.momento} (${estado})`;
-    }).join('\n');
+    const momentoActual = params.momentos[params.currentIndex];
+    const siguiente = params.currentIndex < params.momentos.length - 1
+      ? params.momentos[params.currentIndex + 1].momento
+      : 'FIN';
 
-    const fragmentosContext = params.fragmentos
-      .map((frag, idx) => `Fragmento ${idx + 1}: ${frag.texto.substring(0, 150)}...`)
+    // Solo incluir puntos clave más esenciales (máximo 3)
+    const keyPointsList = params.keyPoints
+      .slice(0, 3)
+      .map((point, idx) => `${idx + 1}. ${point}`)
       .join('\n');
 
-    return `${this.BASE_PROMPT}
+    // Obtener preguntas específicas del momento actual
+    const preguntas = momentoActual?.preguntas || [];
+    const preguntasTexto = preguntas
+      .map((p, idx) => `  ${idx + 1}. ${p}`)
+      .join('\n');
 
-Eres un ${params.specialistRole} enseñando "${params.sessionName}" del curso "${params.courseName}".
-OBJETIVO: ${params.learningObjective}
+    // Contenido específico del momento (historia, contenido técnico, caso, etc.)
+    const contenido = this.getMomentoContent(momentoActual);
 
-PUNTOS CLAVE:
-${params.keyPoints.map(p => `- ${p}`).join('\n')}
+    return `**GUION DEL MOMENTO: ${momentoActual?.momento || 'N/A'}**
+Sesión: "${params.sessionName}" (Curso: ${params.courseName})
 
-ESTRUCTURA:
-${momentosContext}
+**OBJETIVO DE APRENDIZAJE:**
+${params.learningObjective}
 
-MOMENTO ACTUAL: ${params.momentos[params.currentIndex].momento}
-CONTENIDO: ${params.momentos[params.currentIndex].texto}
+**PUNTOS CLAVE:**
+${keyPointsList}
 
-FRAGMENTOS:
-${fragmentosContext}`.trim();
+**MOMENTO ACTUAL:** ${momentoActual?.momento || 'N/A'}
+**SIGUIENTE MOMENTO:** ${siguiente}
+
+**CONTENIDO DEL MOMENTO:**
+${contenido}
+
+📋 **INSTRUCCIONES ESTRICTAS:**
+1. Haz exactamente TODAS las preguntas listadas a continuación, **en ese orden**, sin saltear ni improvisar otras.
+2. Después de cada respuesta del estudiante, **comenta brevemente** (1 o 2 frases) reconociendo el avance.
+3. No avances al siguiente momento hasta que todas las preguntas estén completamente respondidas.
+4. Si la respuesta del estudiante no cubre algún punto, **repregunta con una pista** centrándote en lo que falta.
+5. Usa un tono **cercano y docente**, como si estuvieras dando clase frente a un estudiante real.
+6. No otorgues información del siguiente momento.
+
+**PREGUNTAS DEL MOMENTO:**
+${preguntasTexto}
+
+💡 **IMPORTANTE:** Si el estudiante no responde o responde parcialmente, insiste antes de avanzar.`.trim();
   }
 
   /**
    * Construye el prompt del usuario optimizado
    */
   static buildUserPrompt(studentMessage: string, context: UserPromptContext): string {
-    return `Estudiante dice: "${studentMessage}"
+    const [progresoActual, totalMomentos] = context.progress.split('/');
+    
+    return `Estudiante: "${studentMessage}"
 
-MOMENTO ACTUAL: ${context.currentMoment}
-PROGRESO: ${context.progress}
-
-IMPORTANTE: Responde ÚNICAMENTE en formato JSON válido:
+Responde en JSON:
 {
   "respuesta": "Respuesta del docente",
   "momento_actual": "${context.currentMoment}",
-  "debe_avanzar": true/false,
-  "razon_avance": "Razón del avance"
+  "progreso": ${progresoActual},
+  "total_momentos": ${totalMomentos},
+  "debe_avanzar": false,
+  "razon_avance": "Razón del avance",
+  "siguiente_momento": "MOMENTO_X"
 }`;
   }
 
   /**
-   * Construye prompt para extracción de momentos
+   * Carga el archivo de sesión según el curso y sesión
    */
-  static buildMomentosExtractionPrompt(courseName: string, sessionName: string, fileId: string): string {
-    return `IMPORTANTE: Responde ÚNICAMENTE con un JSON válido, sin texto adicional.
+  static async loadSessionFile(courseId: string, sessionId: string): Promise<any> {
+    try {
+      const sessionFileName = `${courseId}_${sessionId}.json`;
+      
+      // Intentar múltiples rutas posibles para import dinámico
+      const possiblePaths = [
+        `../data/sessions/${sessionFileName}`,
+        `../../data/sessions/${sessionFileName}`,
+        `../../../data/sessions/${sessionFileName}`
+      ];
+      
+      let sessionData: any = null;
+      let lastError: any = null;
+      
+      for (const sessionPath of possiblePaths) {
+        try {
+          sessionData = await import(sessionPath);
+          console.log(`✅ Sesión cargada desde: ${sessionPath}`);
+          break;
+        } catch (error) {
+          lastError = error;
+          continue;
+        }
+      }
+      
+      if (!sessionData) {
+        throw lastError || new Error(`No se pudo cargar la sesión ${courseId}_${sessionId}`);
+      }
+      
+      return sessionData.default || sessionData;
+    } catch (error) {
+      console.error(`Error cargando sesión ${courseId}_${sessionId}:`, error);
+      throw new Error(`No se pudo cargar la sesión ${courseId}_${sessionId}`);
+    }
+  }
 
-Revisa el documento adjunto del curso "${courseName}" - sesión "${sessionName}" y extrae exactamente 6 momentos clave según la estructura pedagógica estándar.
-
-RESPUESTA OBLIGATORIA EN JSON:
-[
-  { "momento": "MOMENTO_0", "texto": "Contenido del saludo y conexión inicial", "file_id": "${fileId}"},
-  { "momento": "MOMENTO_1", "texto": "Contenido de activación con historia o caso", "file_id": "${fileId}"},
-  { "momento": "MOMENTO_2", "texto": "Contenido de adquisición de conocimientos", "file_id": "${fileId}"},
-  { "momento": "MOMENTO_3", "texto": "Contenido de aplicación práctica", "file_id": "${fileId}"},
-  { "momento": "MOMENTO_4", "texto": "Contenido de discusión y contraste", "file_id": "${fileId}"},
-  { "momento": "MOMENTO_5", "texto": "Contenido de reflexión final y cierre", "file_id": "${fileId}"}
-]
-
-Estructura de momentos:
-- MOMENTO_0: Saludo y Conexión Inicial
-- MOMENTO_1: Activación con Historia o Caso  
-- MOMENTO_2: Adquisición de Conocimientos
-- MOMENTO_3: Aplicación Práctica
-- MOMENTO_4: Discusión y Contraste
-- MOMENTO_5: Reflexión Final y Cierre
-
-Extrae el contenido real del documento para cada momento. No inventes contenido.`;
+  /**
+   * Obtiene la información de la sesión desde el archivo JSON
+   */
+  static async getSessionData(courseId: string, sessionId: string): Promise<{
+    curso: string;
+    sesion: string;
+    nombre: string;
+    objetivo: string;
+    momentos: any[];
+  }> {
+    const sessionData = await this.loadSessionFile(courseId, sessionId);
+    
+    return {
+      curso: sessionData.curso,
+      sesion: sessionData.sesion,
+      nombre: sessionData.nombre,
+      objetivo: sessionData.objetivo,
+      momentos: sessionData.momentos || []
+    };
   }
 } 

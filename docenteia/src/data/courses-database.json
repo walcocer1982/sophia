@@ -10,8 +10,6 @@
         {
           "id": "sesion01",
           "name": "IPERC - Identificación de Peligros, Evaluación de Riesgos y Controles",
-          "file_id": "file-LtVxVon3svgvNrafJLhbXS",
-          "file_name": "contenido_sso_sesion01_MSEII.md",
           "learning_objective": "El estudiante identifica peligros en una situación laboral, evalúa los riesgos asociados y propone controles adecuados para prevenir accidentes",
           "key_points": [
             "Comprende qué es un peligro y cómo se reconoce en el ambiente laboral",
@@ -34,8 +32,6 @@
         {
           "id": "sesion02", 
           "name": "Sesión 02 de SSO",
-          "file_id": "file-MLGfPC2nruo5t5jjC9En1a",
-          "file_name": "contenido_sso_sesion02_MSEII.json",
           "learning_objective": "El estudiante aplica procedimientos de seguridad en situaciones específicas del trabajo",
           "key_points": [
             "Identifica procedimientos de seguridad relevantes",
@@ -58,8 +54,7 @@
         {
           "id": "sesion03",
           "name": "Prevención de Incendios en el Trabajo", 
-          "file_id": "file-MPwrLaMwDkie5yQrymSRqo",
-          "file_name": "contenido_sso_sesion03_MSEII.json",
+          "session_file": "SSO001_sesion03.json",
           "learning_objective": "El estudiante identifica causas de incendios y aplica medidas preventivas y de respuesta",
           "key_points": [
             "Reconoce las causas principales de incendios en el trabajo",
@@ -97,8 +92,6 @@
         {
           "id": "sesion01",
           "name": "Fundamentos de Perforación",
-          "file_id": "file-DAgoSoKwe6frEGeV2WPKFp",
-          "file_name": "contenido_perforacion_sesion01.md",
           "learning_objective": "El estudiante identifica los componentes principales de un equipo de perforación y explica su función en el proceso",
           "key_points": [
             "Comprende qué es un equipo de perforación y sus aplicaciones",
@@ -120,8 +113,6 @@
         {
           "id": "sesion02",
           "name": "Técnicas de Perforación",
-          "file_id": "file-J8LReNPzix92Ly8PTxeJaQ",
-          "file_name": "contenido_perforacion_sesion02.md",
           "learning_objective": "El estudiante aplica técnicas de perforación según el tipo de terreno y objetivo",
           "key_points": [
             "Reconoce diferentes tipos de técnicas de perforación",
@@ -143,8 +134,6 @@
         {
           "id": "sesion03",
           "name": "Mantenimiento de Equipos de Perforación",
-          "file_id": "file-MLGfPC2nruo5t5jjC9En1a",
-          "file_name": "contenido_perforacion_sesion03.md",
           "learning_objective": "El estudiante realiza mantenimiento preventivo y correctivo en equipos de perforación",
           "key_points": [
             "Identifica componentes que requieren mantenimiento regular",
