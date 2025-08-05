@@ -1,16 +1,20 @@
 {
-  "curso": "SSO001",
-  "sesion": "sesion03",
-  "nombre": "Prevención de Incendios en el Trabajo",
-  "objetivo": "El estudiante identifica causas de incendios y aplica medidas preventivas y de respuesta",
+  "id": "sesion03",
+  "name": "Prevención de Incendios en el Trabajo",
+  "learning_objective": "El estudiante identifica causas de incendios y aplica medidas preventivas y de respuesta",
+  "key_points": [
+    "Identificación de causas de incendios",
+    "Medidas preventivas",
+    "Uso correcto de extintores",
+    "Protocolos de evacuación"
+  ],
   "momentos": [
     {
       "momento": "Saludo (exposición del aprendizaje esperado y los puntos clave)",
       "instrucciones_docenteia": "Presentar el objetivo de la sesión y los puntos clave a desarrollar",
       "preguntas": [
         "¿Qué sabes sobre incendios en el trabajo?",
-        "¿Has presenciado alguna situación de riesgo de incendio?",
-        "¿Qué esperas aprender en esta sesión?"
+        "¿Has presenciado alguna situación de riesgo de incendio?"        
       ]
     },
     {
