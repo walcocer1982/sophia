@@ -9,6 +9,7 @@ export interface Course {
 export interface Session {
   id: string;
   name: string;
+  session_file?: string; // Archivo JSON de la sesión (opcional)
   learning_objective: string;
   key_points: string[];
   theme_keywords: string[];
@@ -37,6 +38,8 @@ export interface SessionData {
   sessionContent?: any; // Contenido completo de la sesión desde JSON
   conversationLog: Array<{ role: 'user' | 'assistant'; content: string; timestamp: Date }>; // Memoria conversacional
   isFirstTurn: boolean; // Para enviar el mensaje de "espíritu" solo una vez
+  preguntasPendientes: string[]; // Preguntas pendientes del momento actual
+  preguntasRespondidas: string[]; // Preguntas ya respondidas del momento actual
 }
 
 export interface AIResponse {
@@ -49,6 +52,9 @@ export interface AIResponse {
   siguiente_momento: string;
   momentos?: Moment[];
   sessionKey?: string;
+  pregunta_actual?: string;
+  preguntas_pendientes?: number;
+  preguntas_respondidas?: number;
 }
 
 export interface CostMetrics {

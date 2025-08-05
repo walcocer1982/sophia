@@ -1,0 +1,70 @@
+{
+  "curso": "SSO001",
+  "sesion": "sesion02",
+  "nombre": "Procedimientos de Seguridad en el Trabajo",
+  "objetivo": "El estudiante aplica procedimientos de seguridad en situaciones específicas del trabajo",
+  "momentos": [
+    {
+      "momento": "Saludo (exposición del aprendizaje esperado y los puntos clave)",
+      "instrucciones_docenteia": "Presentar el objetivo de la sesión sobre procedimientos de seguridad",
+      "preguntas": [
+        "¿Qué procedimientos de seguridad conoces?",
+        "¿Has seguido algún protocolo de seguridad en tu trabajo?",
+        "¿Qué esperas aprender sobre procedimientos de seguridad?"
+      ]
+    },
+    {
+      "momento": "Conexión",
+      "instrucciones_docenteia": "Narrar una situación de trabajo para conectar con experiencias previas",
+      "historia": "En una obra de construcción, un trabajador debe realizar trabajos en altura. ¿Qué procedimientos de seguridad debería seguir? ¿Qué equipos de protección necesitaría?",
+      "preguntas": [
+        "¿Qué elementos de seguridad identificas en esta situación?",
+        "¿Qué podría salir mal si no se siguen los procedimientos?",
+        "¿Has presenciado alguna situación similar?"
+      ]
+    },
+    {
+      "momento": "Adquisición",
+      "instrucciones_docenteia": "Explicar los procedimientos de seguridad básicos",
+      "contenido_tecnico": [
+        "PROCEDIMIENTO: secuencia de pasos para realizar una tarea de forma segura",
+        "EQUIPOS DE PROTECCIÓN PERSONAL (EPP): elementos que protegen al trabajador",
+        "SEÑALIZACIÓN: indicadores visuales que advierten sobre peligros",
+        "PROTOCOLOS DE EMERGENCIA: pasos a seguir en caso de accidente"
+      ],
+      "preguntas": [
+        "¿Qué elementos debe tener un procedimiento de seguridad?",
+        "¿Cómo se selecciona el EPP adecuado?",
+        "¿Qué tipos de señalización conoces?"
+      ]
+    },
+    {
+      "momento": "Aplicación",
+      "instrucciones_docenteia": "Presentar un caso práctico para aplicar procedimientos",
+      "caso": "En un laboratorio químico, un trabajador debe manipular sustancias peligrosas. ¿Qué procedimientos debería seguir?",
+      "preguntas": [
+        "¿Qué procedimientos específicos aplicarías?",
+        "¿Qué EPP necesitaría el trabajador?",
+        "¿Qué medidas de emergencia deberían estar disponibles?"
+      ]
+    },
+    {
+      "momento": "Discusión",
+      "instrucciones_docenteia": "Facilitar la comparación de diferentes procedimientos",
+      "preguntas": [
+        "¿Qué procedimiento prefieres y por qué?",
+        "¿Hay situaciones donde un procedimiento es mejor que otro?",
+        "¿Qué limitaciones tienen los procedimientos?"
+      ]
+    },
+    {
+      "momento": "Reflexión",
+      "instrucciones_docenteia": "Guiar la reflexión sobre lo aprendido y su aplicación práctica",
+      "preguntas": [
+        "¿Qué concepto te quedó más claro?",
+        "¿Cómo aplicarás estos procedimientos en tu trabajo?",
+        "¿Qué más te gustaría aprender sobre seguridad?"
+      ]
+    }
+  ]
+} 

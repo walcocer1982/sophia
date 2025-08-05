@@ -1,159 +1,73 @@
-import { SessionData, SessionInfo, CacheStats, Course, Session, Moment } from '../types';
+// src/services/SessionManager.ts
+
 import * as fs from 'fs';
 import * as path from 'path';
+import { SessionData, Course, Session } from '../types';
 
 export class SessionManager {
-  private sessions = new Map<string, SessionData>();
-  private cache = new Map<string, any>();
-  private courseData: any;
+  private sessions: Map<string, SessionData> = new Map();
+  private cache: Map<string, any> = new Map();
 
   constructor() {
-    this.courseData = JSON.parse(fs.readFileSync(path.join(__dirname, '../data/courses-database.json'), 'utf8'));
+    // Limpiar sesiones al iniciar
+    this.sessions.clear();
+    this.cache.clear();
   }
 
   /**
-   * Inicia una sesión cargando JSON directamente
+   * Inicia una nueva sesión
    */
   async startSession(courseId: string, sessionId: string): Promise<string> {
-    const sessionKey = `${courseId}-${sessionId}`;
-    
-    // Si la sesión ya existe, retornarla
-    if (this.sessions.has(sessionKey)) {
-      console.log(`✅ Sesión ${sessionKey} ya existe, reutilizando`);
-      return sessionKey;
-    }
-
-    console.log(`🚀 Iniciando nueva sesión: ${sessionKey}`);
-    
-    // Obtener información del curso y sesión
-    const { course, session } = this.getCourseSessionInfo(courseId, sessionId);
-    
-    // Cargar contenido de la sesión desde JSON
-    const sessionContent = this.loadSessionContent(courseId, sessionId);
-    
-    // Extraer tema esperado
-    const expectedTheme = this.extractThemeFromSession(session.name);
-    
-    // Crear datos de sesión iniciales
-    const sessionData: SessionData = {
-      courseId,
-      sessionId,
-      sessionFile: `${courseId}_${sessionId}.json`,
-      course,
-      session,
-      expectedTheme,
-      momentos: sessionContent.momentos || [],
-      currentMomentIndex: 0,
-      startTime: new Date(),
-      lastActivity: new Date(),
-      sessionContent, // Agregar contenido completo de la sesión
-      conversationLog: [], // Inicializar memoria conversacional vacía
-      isFirstTurn: true // Marcar como primer turno para enviar el "espíritu"
-    };
-
-    this.sessions.set(sessionKey, sessionData);
-    
-    return sessionKey;
-  }
-
-  /**
-   * Obtiene información del curso y sesión
-   */
-  getCourseSessionInfo(courseId: string, sessionId: string): {
-    course: Course;
-    session: Session;
-  } {
-    const course = this.courseData.courses.find((c: Course) => c.id === courseId);
-    if (!course) {
-      throw new Error(`Curso ${courseId} no encontrado`);
-    }
-
-    const session = course.sessions.find((s: Session) => s.id === sessionId);
-    if (!session) {
-      throw new Error(`Sesión ${sessionId} no encontrada en curso ${courseId}`);
-    }
-
-    return {
-      course,
-      session
-    };
-  }
-
-  /**
-   * Carga el contenido de la sesión desde JSON
-   */
-  private loadSessionContent(courseId: string, sessionId: string): any {
     try {
-      const fileName = `${courseId}_${sessionId}.json`;
+      const sessionKey = `${courseId}-${sessionId}`;
       
-      // Intentar múltiples rutas posibles
-      const possiblePaths = [
-        path.join(__dirname, '../data/sessions', fileName),
-        path.join(__dirname, '../../data/sessions', fileName),
-        path.join(__dirname, '../../../data/sessions', fileName)
-      ];
+      // Cargar datos del curso
+      const courseData = await this.loadCourseData(courseId);
+      const course = courseData.courses.find((c: Course) => c.id === courseId);
       
-      let filePath: string | null = null;
-      for (const testPath of possiblePaths) {
-        if (fs.existsSync(testPath)) {
-          filePath = testPath;
-          break;
-        }
+      if (!course) {
+        throw new Error(`Curso ${courseId} no encontrado`);
       }
-      
-      if (!filePath) {
-        console.log(`⚠️ Archivo no encontrado en rutas: ${possiblePaths.join(', ')}`);
-        console.log(`📁 Usando contenido básico para: ${fileName}`);
-        return this.createBasicSessionContent();
-      }
-      
-      const content = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-      console.log(`✅ Contenido cargado desde: ${filePath}`);
-      return content;
-    } catch (error) {
-      console.error(`❌ Error cargando contenido de sesión: ${error}`);
-      return this.createBasicSessionContent();
-    }
-  }
 
-  /**
-   * Crea contenido básico de sesión si no existe el archivo
-   */
-  private createBasicSessionContent(): any {
-    return {
-      momentos: [
-        {
-          momento: "Saludo (exposición del aprendizaje esperado y los puntos clave)",
-          instrucciones_docenteia: "Presentar el objetivo de la sesión y los puntos clave a desarrollar",
-          preguntas: ["¿Qué sabes sobre este tema?", "¿Qué esperas aprender hoy?"]
-        },
-        {
-          momento: "Conexión",
-          instrucciones_docenteia: "Narrar una historia o situación para conectar con experiencias previas",
-          preguntas: ["¿Qué observas en esta situación?", "¿Cómo se relaciona con tu experiencia?"]
-        },
-        {
-          momento: "Adquisición",
-          instrucciones_docenteia: "Explicar los conceptos técnicos principales",
-          preguntas: ["¿Qué conceptos nuevos identificas?", "¿Cómo se conectan con lo que ya sabías?"]
-        },
-        {
-          momento: "Aplicación",
-          instrucciones_docenteia: "Presentar un caso práctico para aplicar los conocimientos",
-          preguntas: ["¿Cómo aplicarías estos conceptos?", "¿Qué pasos seguirías?"]
-        },
-        {
-          momento: "Discusión",
-          instrucciones_docenteia: "Facilitar la comparación y discusión de diferentes enfoques",
-          preguntas: ["¿Qué opinas sobre este enfoque?", "¿Hay otras alternativas?"]
-        },
-        {
-          momento: "Reflexión",
-          instrucciones_docenteia: "Guiar la reflexión sobre lo aprendido y su aplicación práctica",
-          preguntas: ["¿Qué aprendiste hoy?", "¿Cómo aplicarás estos conocimientos?"]
-        }
-      ]
-    };
+      const session = course.sessions.find((s: Session) => s.id === sessionId);
+      if (!session) {
+        throw new Error(`Sesión ${sessionId} no encontrada`);
+      }
+
+      // Cargar contenido de la sesión
+      const sessionContent = await this.loadSessionContent(courseId, sessionId);
+      
+      // Crear datos de sesión
+      const sessionData: SessionData = {
+        courseId,
+        sessionId,
+        sessionFile: `${courseId}_${sessionId}.json`,
+        course,
+        session,
+        expectedTheme: this.extractThemeFromSession(session.name),
+        momentos: sessionContent.momentos || [],
+        currentMomentIndex: 0,
+        startTime: new Date(),
+        lastActivity: new Date(),
+        sessionContent,
+        conversationLog: [],
+        isFirstTurn: true,
+        preguntasPendientes: sessionContent.momentos?.[0]?.preguntas || [],
+        preguntasRespondidas: []
+      };
+
+      // Guardar sesión
+      this.sessions.set(sessionKey, sessionData);
+      
+      console.log(`🚀 Iniciando nueva sesión: ${sessionKey}`);
+      console.log(`✅ Contenido cargado desde: ${this.getSessionFilePath(courseId, sessionId)}`);
+      
+      return sessionKey;
+
+    } catch (error) {
+      console.error('Error iniciando sesión:', error);
+      throw error;
+    }
   }
 
   /**
@@ -166,26 +80,28 @@ export class SessionManager {
   /**
    * Actualiza una sesión
    */
-  updateSession(sessionKey: string, updates: Partial<SessionData>): void {
+  updateSession(sessionKey: string, updates: Partial<SessionData>): boolean {
     const session = this.sessions.get(sessionKey);
-    if (session) {
-      Object.assign(session, updates);
-      session.lastActivity = new Date();
-    }
+    if (!session) return false;
+
+    Object.assign(session, updates);
+    return true;
   }
 
   /**
    * Lista todas las sesiones activas
    */
-  listActiveSessions(): SessionInfo[] {
-    return Array.from(this.sessions.entries()).map(([key, session]) => ({
+  listActiveSessions(): Array<{
+    sessionKey: string;
+    course: string;
+    session: string;
+    progress: string;
+  }> {
+    return Array.from(this.sessions.entries()).map(([key, data]) => ({
       sessionKey: key,
-      course: session.course.name,
-      session: session.session.name,
-      currentMoment: session.momentos[session.currentMomentIndex]?.momento || 'N/A',
-      progress: `${session.currentMomentIndex + 1}/${session.momentos.length}`,
-      startTime: session.startTime,
-      lastActivity: session.lastActivity
+      course: data.course.name,
+      session: data.session.name,
+      progress: `${data.currentMomentIndex + 1}/${data.momentos.length}`
     }));
   }
 
@@ -204,42 +120,100 @@ export class SessionManager {
   }
 
   /**
-   * Obtiene estadísticas del caché
+   * Obtiene estadísticas del cache
    */
-  getCacheStats(): CacheStats {
+  getCacheStats(): {
+    activeSessions: number;
+    cacheSize: number;
+    sessionsSize: number;
+  } {
     return {
+      activeSessions: this.sessions.size,
       cacheSize: this.cache.size,
-      sessionsSize: this.sessions.size,
-      activeSessions: this.sessions.size
+      sessionsSize: this.sessions.size
     };
   }
 
   /**
-   * Limpia el caché
+   * Limpia el cache
    */
   clearCache(): void {
     this.cache.clear();
   }
 
   /**
-   * Obtiene un valor del caché
+   * Carga datos del curso desde la base de datos
    */
-  getFromCache(key: string): any {
-    return this.cache.get(key);
+  private async loadCourseData(courseId: string): Promise<any> {
+    const cacheKey = `course_${courseId}`;
+    
+    if (this.cache.has(cacheKey)) {
+      return this.cache.get(cacheKey);
+    }
+
+    try {
+      const filePath = path.join(__dirname, '../data/courses-database.json');
+      const data = fs.readFileSync(filePath, 'utf8');
+      const parsedData = JSON.parse(data);
+      
+      this.cache.set(cacheKey, parsedData);
+      return parsedData;
+    } catch (error) {
+      console.error('Error cargando datos del curso:', error);
+      throw error;
+    }
   }
 
   /**
-   * Guarda un valor en el caché
+   * Carga contenido de la sesión desde archivo JSON
    */
-  setCache(key: string, value: any): void {
-    this.cache.set(key, value);
+  private async loadSessionContent(courseId: string, sessionId: string): Promise<any> {
+    const cacheKey = `session_${courseId}_${sessionId}`;
+    
+    if (this.cache.has(cacheKey)) {
+      return this.cache.get(cacheKey);
+    }
+
+    try {
+      // Intentar múltiples rutas posibles
+      const possiblePaths = [
+        path.join(__dirname, '../data/sessions', `${courseId}_${sessionId}.json`),
+        path.join(__dirname, '../data/sessions', `${sessionId}.json`),
+        path.join(__dirname, '../data/sessions', `${courseId}_${sessionId.replace('sesion', 'sesion0')}.json`)
+      ];
+
+      let sessionData = null;
+      let loadedPath = '';
+
+      for (const filePath of possiblePaths) {
+        if (fs.existsSync(filePath)) {
+          const data = fs.readFileSync(filePath, 'utf8');
+          sessionData = JSON.parse(data);
+          loadedPath = filePath;
+          break;
+        }
+      }
+
+      if (!sessionData) {
+        throw new Error(`No se pudo cargar el contenido de la sesión ${courseId}_${sessionId}`);
+      }
+
+      this.cache.set(cacheKey, sessionData);
+      console.log(`✅ Contenido cargado desde: ${loadedPath}`);
+      
+      return sessionData;
+
+    } catch (error) {
+      console.error('Error cargando contenido de sesión:', error);
+      throw error;
+    }
   }
 
   /**
-   * Verifica si existe una clave en el caché
+   * Obtiene la ruta del archivo de sesión
    */
-  hasCache(key: string): boolean {
-    return this.cache.has(key);
+  private getSessionFilePath(courseId: string, sessionId: string): string {
+    return path.join(__dirname, '../data/sessions', `${courseId}_${sessionId}.json`);
   }
 
   /**
@@ -250,14 +224,5 @@ export class SessionManager {
     if (sessionNameLower.includes('iperc')) return 'IPERC';
     if (sessionNameLower.includes('incendio')) return 'Incendios';
     return 'Seguridad';
-  }
-
-  /**
-   * Valida que los momentos correspondan al tema
-   */
-  validateMomentosTheme(momentos: Moment[], expectedTheme: string): void {
-    if (!momentos || momentos.length === 0) {
-      throw new Error(`No se encontraron momentos válidos para el tema ${expectedTheme}`);
-    }
   }
 } 

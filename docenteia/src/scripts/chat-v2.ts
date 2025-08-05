@@ -1,7 +1,7 @@
 import * as readline from 'readline';
 import * as fs from 'fs';
 import * as path from 'path';
-import { SessionExtractor } from '../lib/SessionExtractor';
+import { SessionExtractorUniversal } from '../lib/SessionExtractorUniversal';
 import { Course, Session } from '../types';
 import * as dotenv from 'dotenv';
 
@@ -25,7 +25,7 @@ const colors = {
 interface ConversationState {
   selectedCourse: Course | null;
   selectedSession: Session | null;
-  sessionExtractor: SessionExtractor | null;
+  sessionExtractor: SessionExtractorUniversal | null;
   currentSessionKey: string | null;
   momentoActual: number;
   momentos: any[];
@@ -120,12 +120,12 @@ async function selectCourse(courseId: string, sessionNumber: number): Promise<vo
     console.log(`✅ Objetivo: ${session.learning_objective}`);
     console.log(`📁 Archivo de sesión: ${courseId}_${sessionId}.json`);
 
-    // Inicializar el extractor simplificado
-    conversationState.sessionExtractor = new SessionExtractor();
+    // Inicializar el extractor universal
+    conversationState.sessionExtractor = new SessionExtractorUniversal();
     
     console.log(`🚀 Iniciando sesión...`);
     
-    // Iniciar sesión cargando JSON directamente
+    // 👈 CAMBIADO: Usar startSession que devuelve mensaje inicial
     const sessionInfo = await conversationState.sessionExtractor.startSession(courseId, sessionId);
     conversationState.currentSessionKey = sessionInfo.sessionKey;
     
@@ -133,8 +133,13 @@ async function selectCourse(courseId: string, sessionNumber: number): Promise<vo
     console.log(`✅ Clave de sesión: ${sessionInfo.sessionKey}`);
     console.log(`✅ Momento actual: ${sessionInfo.currentMoment}`);
 
+    // 👈 NUEVO: Mostrar mensaje inicial del docente
+    print('green', `\n🎓 ${course.specialist_role}:`);
+    print('white', sessionInfo.initialMessage);
+
     // Obtener momentos para mostrar estructura
-    conversationState.momentos = await conversationState.sessionExtractor.getMomentosDelArchivo(courseId, sessionId);
+    const sessionData = conversationState.sessionExtractor.getSessionInfo(sessionInfo.sessionKey);
+    conversationState.momentos = sessionData?.momentos || [];
     conversationState.momentoActual = 0;
 
     console.log(`📄 Momentos extraídos: ${conversationState.momentos.length}`);
@@ -142,6 +147,10 @@ async function selectCourse(courseId: string, sessionNumber: number): Promise<vo
     conversationState.momentos.forEach((momento: any, index: number) => {
       console.log(`   ${index + 1}. ${momento.momento}`);
     });
+
+    // 👈 NUEVO: Marcar que ya estamos en clase
+    conversationState.isInClass = true;
+    print('cyan', `\n✅ ¡Clase iniciada! Puedes responder directamente al docente.`);
 
   } catch (error) {
     console.error(`❌ Error seleccionando curso: ${error instanceof Error ? error.message : 'Error desconocido'}`);

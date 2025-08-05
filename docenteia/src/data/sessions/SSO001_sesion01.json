@@ -1,0 +1,70 @@
+{
+  "curso": "SSO001",
+  "sesion": "sesion01",
+  "nombre": "IPERC - Identificación de Peligros, Evaluación de Riesgos y Controles",
+  "objetivo": "El estudiante identifica peligros en una situación laboral, evalúa los riesgos asociados y propone controles adecuados para prevenir accidentes",
+  "momentos": [
+    {
+      "momento": "Saludo (exposición del aprendizaje esperado y los puntos clave)",
+      "instrucciones_docenteia": "Presentar el objetivo de la sesión IPERC y los puntos clave a desarrollar",
+      "preguntas": [
+        "¿Qué sabes sobre identificación de peligros en el trabajo?",
+        "¿Has identificado algún peligro en tu entorno laboral?",
+        "¿Qué esperas aprender sobre evaluación de riesgos?"
+      ]
+    },
+    {
+      "momento": "Conexión",
+      "instrucciones_docenteia": "Narrar una situación laboral para conectar con experiencias previas",
+      "historia": "En una fábrica de producción, un trabajador está operando una máquina sin las protecciones adecuadas. ¿Qué peligros identificas en esta situación? ¿Qué riesgos podrían existir?",
+      "preguntas": [
+        "¿Qué elementos de riesgo identificas en esta situación?",
+        "¿Qué podría salir mal en este escenario?",
+        "¿Cómo se relaciona esto con tu experiencia laboral?"
+      ]
+    },
+    {
+      "momento": "Adquisición",
+      "instrucciones_docenteia": "Explicar los conceptos de IPERC",
+      "contenido_tecnico": [
+        "IPERC significa: Identificación de Peligros, Evaluación de Riesgos y Controles",
+        "PELIGRO: fuente, situación o acto con potencial de causar daño",
+        "RIESGO: combinación de la probabilidad de ocurrencia y la severidad del daño",
+        "CONTROL: medida implementada para eliminar o reducir el riesgo"
+      ],
+      "preguntas": [
+        "¿Qué diferencia hay entre peligro y riesgo?",
+        "¿Cómo se evalúa la probabilidad de un riesgo?",
+        "¿Qué tipos de controles conoces?"
+      ]
+    },
+    {
+      "momento": "Aplicación",
+      "instrucciones_docenteia": "Presentar un caso práctico para aplicar IPERC",
+      "caso": "En un taller de mantenimiento, un trabajador debe cambiar una lámpara en altura. ¿Cómo aplicarías el método IPERC en esta situación?",
+      "preguntas": [
+        "¿Qué peligros identificas en este caso?",
+        "¿Cómo evaluarías los riesgos?",
+        "¿Qué controles propondrías?"
+      ]
+    },
+    {
+      "momento": "Discusión",
+      "instrucciones_docenteia": "Facilitar la comparación de diferentes enfoques de control",
+      "preguntas": [
+        "¿Qué estrategia de control prefieres y por qué?",
+        "¿Hay situaciones donde una estrategia es mejor que otra?",
+        "¿Qué limitaciones tiene cada enfoque?"
+      ]
+    },
+    {
+      "momento": "Reflexión",
+      "instrucciones_docenteia": "Guiar la reflexión sobre lo aprendido y su aplicación práctica",
+      "preguntas": [
+        "¿Qué concepto te quedó más claro?",
+        "¿Cómo aplicarás IPERC en tu trabajo?",
+        "¿Qué más te gustaría aprender sobre evaluación de riesgos?"
+      ]
+    }
+  ]
+} 
