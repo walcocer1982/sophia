@@ -10,6 +10,7 @@
         {
           "id": "sesion01",
           "name": "IPERC - Identificación de Peligros, Evaluación de Riesgos y Controles",
+          "session_file": "SSO001_sesion01.json",
           "learning_objective": "El estudiante identifica peligros en una situación laboral, evalúa los riesgos asociados y propone controles adecuados para prevenir accidentes",
           "key_points": [
             "Comprende qué es un peligro y cómo se reconoce en el ambiente laboral",
@@ -32,6 +33,7 @@
         {
           "id": "sesion02", 
           "name": "Sesión 02 de SSO",
+          "session_file": "SSO001_sesion02.json",
           "learning_objective": "El estudiante aplica procedimientos de seguridad en situaciones específicas del trabajo",
           "key_points": [
             "Identifica procedimientos de seguridad relevantes",

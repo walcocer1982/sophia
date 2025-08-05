@@ -6,7 +6,7 @@
   "momentos": [
     {
       "momento": "Saludo (exposición del aprendizaje esperado y los puntos clave)",
-      "instrucciones docenteia": "Presentar el objetivo de la sesión y los puntos clave a desarrollar",
+      "instrucciones_docenteia": "Presentar el objetivo de la sesión y los puntos clave a desarrollar",
       "preguntas": [
         "¿Qué sabes sobre incendios en el trabajo?",
         "¿Has presenciado alguna situación de riesgo de incendio?",
@@ -15,7 +15,7 @@
     },
     {
       "momento": "Conexión",
-      "instrucciones docenteia": "Narrar la historia de la fábrica textil para conectar con experiencias previas",
+      "instrucciones_docenteia": "Narrar la historia de la fábrica textil para conectar con experiencias previas",
       "historia": "En una fábrica textil, un trabajador está usando una máquina de soldadura cerca de telas almacenadas. De repente, una chispa salta hacia las telas y comienza un pequeño fuego. ¿Qué crees que pasó? ¿Por qué se inició el incendio? ¿Te ha pasado algo parecido o has escuchado de un caso similar?",
       "preguntas": [
         "¿Qué elementos identificas en esta situación?",
@@ -26,7 +26,7 @@
     },
     {
       "momento": "Adquisición",
-      "instrucciones docenteia": "Explicar el Triángulo del Fuego y los tipos de extintores",
+      "instrucciones_docenteia": "Explicar el Triángulo del Fuego y los tipos de extintores",
       "contenido_tecnico": [
         "El Triángulo del Fuego está compuesto por tres elementos esenciales",
         "COMBUSTIBLE: cualquier material que puede arder (madera, papel, telas, gasolina, etc.)",
@@ -48,7 +48,7 @@
     },
     {
       "momento": "Aplicación",
-      "instrucciones docenteia": "Presentar el caso de la carpintería para aplicar los conocimientos",
+      "instrucciones_docenteia": "Presentar el caso de la carpintería para aplicar los conocimientos",
       "caso": "En una carpintería donde trabajan 10 personas, hay madera, barnices, equipos eléctricos, y una estufa para calentar el ambiente. Un día, un trabajador está barnizando una pieza cerca de la estufa cuando se derrama barniz sobre la estufa caliente y se inicia un incendio. Usando el Triángulo del Fuego, analicemos este caso: ¿Cuáles son los tres elementos presentes? ¿Qué tipo de extintor sería el más adecuado? ¿Qué medidas preventivas se podrían haber implementado?",
       "preguntas": [
         "En este caso de la carpintería, ¿cuáles son los tres elementos del Triángulo del Fuego?",
@@ -60,7 +60,7 @@
     },
     {
       "momento": "Discusión",
-      "instrucciones docenteia": "Facilitar la comparación de diferentes enfoques de prevención",
+      "instrucciones_docenteia": "Facilitar la comparación de diferentes enfoques de prevención",
       "preguntas": [
         "¿Qué estrategia prefieres y por qué?",
         "¿Hay situaciones donde una estrategia es mejor que otra?",
@@ -69,7 +69,7 @@
     },
     {
       "momento": "Reflexión",
-      "instrucciones docenteia": "Guiar la reflexión sobre lo aprendido y su aplicación práctica",
+      "instrucciones_docenteia": "Guiar la reflexión sobre lo aprendido y su aplicación práctica",
       "preguntas": [
         "¿Qué concepto te quedó más claro?",
         "¿Cómo cambiará tu forma de trabajar después de esta sesión?",

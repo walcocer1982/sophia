@@ -1,5 +1,5 @@
 import { OpenAI } from 'openai';
-import { OpenAICallParams, OpenAICallResult, CostMetrics } from '../types';
+import { OpenAICallParams, OpenAICallResult } from '../types';
 import { CostMonitor } from './CostMonitor';
 
 export class OpenAIService {
