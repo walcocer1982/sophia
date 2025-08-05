@@ -1,39 +1,33 @@
 {
-  "name": "docenteia",
-  "version": "0.1.0",
-  "private": true,
+  "name": "docenteia-v2",
+  "version": "2.0.0",
+  "description": "Sistema DocenteIA Refactorizado con OpenAI Responses API",
+  "main": "dist/index.js",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "chat": "tsc src/scripts/chat-v2.ts --outDir dist && node dist/scripts/chat-v2.js",
-    "chat:dev": "tsx src/scripts/chat-v2.ts"
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "jest",
+    "lint": "eslint src/**/*.ts",
+    "chat": "tsx src/scripts/chat.ts",
+    "chat-interactive": "tsx src/scripts/chat-interactive.ts",
+    "chat-fluido": "tsx src/scripts/chat-fluido.ts"
   },
   "dependencies": {
-    "@openai/agents": "^0.0.13",
-    "autoprefixer": "^10.4.21",
-    "axios": "^1.11.0",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "dotenv": "^17.2.1",
-    "lucide-react": "^0.532.0",
-    "next": "^14.2.0",
     "openai": "^5.10.2",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "tailwind-merge": "^3.3.1",
-    "tailwindcss": "^3.4.17"
+    "zod": "^3.22.4",
+    "dotenv": "^17.2.1",
+    "axios": "^1.11.0"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3",
     "@types/node": "^20.19.9",
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
-    "eslint": "^9",
-    "eslint-config-next": "15.4.4",
-    "flatrepo": "^1.2.0",
+    "typescript": "^5.0.0",
     "tsx": "^4.7.0",
-    "typescript": "^5"
-  }
+    "eslint": "^9.0.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0"
+  },
+  "keywords": ["ai", "education", "openai", "pedagogy"],
+  "author": "Walther Alcocer",
+  "license": "MIT"
 }

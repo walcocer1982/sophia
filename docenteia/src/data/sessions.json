@@ -1,0 +1,183 @@
+[
+  {
+    "sessionKey": "SSO001-sesion03",
+    "sessionData": {
+      "courseId": "SSO001",
+      "sessionId": "sesion03",
+      "course": {
+        "id": "SSO001",
+        "name": "Seguridad contra Incendios",
+        "specialist_role": "Instructor de Seguridad Industrial",
+        "description": "Curso completo sobre prevención y respuesta a incendios en entornos industriales y comerciales"
+      },
+      "session": {
+        "id": "sesion03",
+        "name": "Prevención de Incendios en el Trabajo",
+        "learning_objective": "El estudiante identifica causas de incendios y aplica medidas preventivas y de respuesta",
+        "key_points": [
+          "Identificación de causas de incendios",
+          "Medidas preventivas",
+          "Uso correcto de extintores",
+          "Protocolos de evacuación"
+        ],
+        "momentos": [
+          {
+            "momento": "Saludo (exposición del aprendizaje esperado y los puntos clave)",
+            "preguntas": [
+              "¿Qué sabes sobre incendios en el trabajo?",
+              "¿Has presenciado alguna situación de riesgo de incendio?",
+              "¿Qué esperas aprender en esta sesión?"
+            ],
+            "instrucciones_docenteia": "Presentar el objetivo de la sesión y los puntos clave a desarrollar"
+          },
+          {
+            "momento": "Conexión",
+            "preguntas": [
+              "¿Qué elementos identificas en esta situación?",
+              "¿Qué podría haber prevenido este incidente?",
+              "¿Cómo se relaciona esto con tu experiencia laboral?",
+              "¿Has presenciado alguna situación similar?"
+            ],
+            "historia": "En una fábrica textil, un trabajador está usando una máquina de soldadura cerca de telas almacenadas. De repente, una chispa salta hacia las telas y comienza un pequeño fuego. ¿Qué crees que pasó? ¿Por qué se inició el incendio? ¿Te ha pasado algo parecido o has escuchado de un caso similar?",
+            "instrucciones_docenteia": "Narrar la historia de la fábrica textil para conectar con experiencias previas"
+          },
+          {
+            "momento": "Adquisición",
+            "preguntas": [
+              "¿Qué crees que necesita el fuego para existir?",
+              "¿Has oído hablar del Triángulo del Fuego?",
+              "¿Puedes identificar los tres elementos básicos del fuego?",
+              "¿Qué tipos de extintores conoces y para qué se usan?",
+              "¿Por qué es importante eliminar al menos uno de los elementos del Triángulo del Fuego?",
+              "¿Cómo se relaciona esto con la prevención de incendios?"
+            ],
+            "contenido_tecnico": [
+              "El Triángulo del Fuego está compuesto por tres elementos esenciales",
+              "COMBUSTIBLE: cualquier material que puede arder (madera, papel, telas, gasolina, etc.)",
+              "OXÍGENO: presente en el aire que respiramos",
+              "CALOR: la energía que inicia la reacción de combustión",
+              "Si eliminamos cualquiera de estos tres elementos, el fuego NO puede existir",
+              "Extintor de agua: para combustibles sólidos (clase A)",
+              "Extintor de CO₂: para equipos eléctricos (clase C)",
+              "Extintor de polvo: para múltiples tipos de fuego (clase ABC)"
+            ],
+            "instrucciones_docenteia": "Explicar el Triángulo del Fuego y los tipos de extintores"
+          },
+          {
+            "momento": "Aplicación",
+            "preguntas": [
+              "En este caso de la carpintería, ¿cuáles son los tres elementos del Triángulo del Fuego?",
+              "¿Qué tipo de extintor sería el más adecuado para este incendio y por qué?",
+              "¿Qué medidas preventivas se podrían haber implementado para evitar este incidente?",
+              "¿Cómo se podría haber roto el Triángulo del Fuego antes de que ocurriera el incendio?",
+              "Si tú fueras el responsable de seguridad, ¿qué protocolos establecerías?"
+            ],
+            "caso": "En una carpintería donde trabajan 10 personas, hay madera, barnices, equipos eléctricos, y una estufa para calentar el ambiente. Un día, un trabajador está barnizando una pieza cerca de la estufa cuando se derrama barniz sobre la estufa caliente y se inicia un incendio. Usando el Triángulo del Fuego, analicemos este caso: ¿Cuáles son los tres elementos presentes? ¿Qué tipo de extintor sería el más adecuado? ¿Qué medidas preventivas se podrían haber implementado?",
+            "instrucciones_docenteia": "Presentar el caso de la carpintería para aplicar los conocimientos"
+          },
+          {
+            "momento": "Discusión",
+            "preguntas": [
+              "¿Qué estrategia prefieres y por qué?",
+              "¿Hay situaciones donde una estrategia es mejor que otra?",
+              "¿Qué limitaciones tiene cada enfoque?"
+            ],
+            "instrucciones_docenteia": "Facilitar la comparación de diferentes enfoques de prevención"
+          },
+          {
+            "momento": "Reflexión",
+            "preguntas": [
+              "¿Qué concepto te quedó más claro?",
+              "¿Cómo cambiará tu forma de trabajar después de esta sesión?",
+              "¿Qué más te gustaría aprender sobre prevención de incendios?"
+            ],
+            "instrucciones_docenteia": "Guiar la reflexión sobre lo aprendido y su aplicación práctica"
+          }
+        ]
+      },
+      "momentos": [
+        {
+          "momento": "Saludo (exposición del aprendizaje esperado y los puntos clave)",
+          "preguntas": [
+            "¿Qué sabes sobre incendios en el trabajo?",
+            "¿Has presenciado alguna situación de riesgo de incendio?",
+            "¿Qué esperas aprender en esta sesión?"
+          ],
+          "instrucciones_docenteia": "Presentar el objetivo de la sesión y los puntos clave a desarrollar"
+        },
+        {
+          "momento": "Conexión",
+          "preguntas": [
+            "¿Qué elementos identificas en esta situación?",
+            "¿Qué podría haber prevenido este incidente?",
+            "¿Cómo se relaciona esto con tu experiencia laboral?",
+            "¿Has presenciado alguna situación similar?"
+          ],
+          "historia": "En una fábrica textil, un trabajador está usando una máquina de soldadura cerca de telas almacenadas. De repente, una chispa salta hacia las telas y comienza un pequeño fuego. ¿Qué crees que pasó? ¿Por qué se inició el incendio? ¿Te ha pasado algo parecido o has escuchado de un caso similar?",
+          "instrucciones_docenteia": "Narrar la historia de la fábrica textil para conectar con experiencias previas"
+        },
+        {
+          "momento": "Adquisición",
+          "preguntas": [
+            "¿Qué crees que necesita el fuego para existir?",
+            "¿Has oído hablar del Triángulo del Fuego?",
+            "¿Puedes identificar los tres elementos básicos del fuego?",
+            "¿Qué tipos de extintores conoces y para qué se usan?",
+            "¿Por qué es importante eliminar al menos uno de los elementos del Triángulo del Fuego?",
+            "¿Cómo se relaciona esto con la prevención de incendios?"
+          ],
+          "contenido_tecnico": [
+            "El Triángulo del Fuego está compuesto por tres elementos esenciales",
+            "COMBUSTIBLE: cualquier material que puede arder (madera, papel, telas, gasolina, etc.)",
+            "OXÍGENO: presente en el aire que respiramos",
+            "CALOR: la energía que inicia la reacción de combustión",
+            "Si eliminamos cualquiera de estos tres elementos, el fuego NO puede existir",
+            "Extintor de agua: para combustibles sólidos (clase A)",
+            "Extintor de CO₂: para equipos eléctricos (clase C)",
+            "Extintor de polvo: para múltiples tipos de fuego (clase ABC)"
+          ],
+          "instrucciones_docenteia": "Explicar el Triángulo del Fuego y los tipos de extintores"
+        },
+        {
+          "momento": "Aplicación",
+          "preguntas": [
+            "En este caso de la carpintería, ¿cuáles son los tres elementos del Triángulo del Fuego?",
+            "¿Qué tipo de extintor sería el más adecuado para este incendio y por qué?",
+            "¿Qué medidas preventivas se podrían haber implementado para evitar este incidente?",
+            "¿Cómo se podría haber roto el Triángulo del Fuego antes de que ocurriera el incendio?",
+            "Si tú fueras el responsable de seguridad, ¿qué protocolos establecerías?"
+          ],
+          "caso": "En una carpintería donde trabajan 10 personas, hay madera, barnices, equipos eléctricos, y una estufa para calentar el ambiente. Un día, un trabajador está barnizando una pieza cerca de la estufa cuando se derrama barniz sobre la estufa caliente y se inicia un incendio. Usando el Triángulo del Fuego, analicemos este caso: ¿Cuáles son los tres elementos presentes? ¿Qué tipo de extintor sería el más adecuado? ¿Qué medidas preventivas se podrían haber implementado?",
+          "instrucciones_docenteia": "Presentar el caso de la carpintería para aplicar los conocimientos"
+        },
+        {
+          "momento": "Discusión",
+          "preguntas": [
+            "¿Qué estrategia prefieres y por qué?",
+            "¿Hay situaciones donde una estrategia es mejor que otra?",
+            "¿Qué limitaciones tiene cada enfoque?"
+          ],
+          "instrucciones_docenteia": "Facilitar la comparación de diferentes enfoques de prevención"
+        },
+        {
+          "momento": "Reflexión",
+          "preguntas": [
+            "¿Qué concepto te quedó más claro?",
+            "¿Cómo cambiará tu forma de trabajar después de esta sesión?",
+            "¿Qué más te gustaría aprender sobre prevención de incendios?"
+          ],
+          "instrucciones_docenteia": "Guiar la reflexión sobre lo aprendido y su aplicación práctica"
+        }
+      ],
+      "currentMomentIndex": 0,
+      "preguntasPendientes": [
+        "¿Qué sabes sobre incendios en el trabajo?",
+        "¿Has presenciado alguna situación de riesgo de incendio?",
+        "¿Qué esperas aprender en esta sesión?"
+      ],
+      "preguntasRespondidas": [],
+      "startTime": "2025-08-05T18:12:12.795Z",
+      "lastActivity": "2025-08-05T18:12:23.582Z"
+    }
+  }
+]

@@ -2,166 +2,21 @@
   "courses": [
     {
       "id": "SSO001",
-      "name": "Seguridad y Salud Ocupacional",
-      "description": "Curso completo de SSO con múltiples sesiones de capacitación",
-      "specialist_role": "Especialista en Seguridad y Salud Ocupacional",
-      "vector_store_id": "vs_68823f69d9f08191889fed8f8edd891c",
-      "sessions": [
-        {
-          "id": "sesion01",
-          "name": "IPERC - Identificación de Peligros, Evaluación de Riesgos y Controles",
-          "session_file": "SSO001_sesion01.json",
-          "learning_objective": "El estudiante identifica peligros en una situación laboral, evalúa los riesgos asociados y propone controles adecuados para prevenir accidentes",
-          "key_points": [
-            "Comprende qué es un peligro y cómo se reconoce en el ambiente laboral",
-            "Diferencia entre peligro y riesgo en el contexto de SSO",
-            "Relaciona la severidad y probabilidad para evaluar un riesgo",
-            "Propone controles adecuados según el tipo de peligro identificado"
-          ],
-          "theme_keywords": [
-            "iperc",
-            "identificación",
-            "peligros",
-            "evaluación",
-            "riesgos",
-            "control",
-            "seguridad",
-            "prevención",
-            "accidente"
-          ]
-        },
-        {
-          "id": "sesion02", 
-          "name": "Sesión 02 de SSO",
-          "session_file": "SSO001_sesion02.json",
-          "learning_objective": "El estudiante aplica procedimientos de seguridad en situaciones específicas del trabajo",
-          "key_points": [
-            "Identifica procedimientos de seguridad relevantes",
-            "Aplica medidas de protección personal",
-            "Reconoce señales y señalización de seguridad",
-            "Implementa protocolos de emergencia"
-          ],
-          "theme_keywords": [
-            "procedimientos",
-            "seguridad",
-            "protección",
-            "personal",
-            "señales",
-            "señalización",
-            "protocolos",
-            "emergencia",
-            "medidas"
-          ]
-        },
-        {
-          "id": "sesion03",
-          "name": "Prevención de Incendios en el Trabajo", 
-          "session_file": "SSO001_sesion03.json",
-          "learning_objective": "El estudiante identifica causas de incendios y aplica medidas preventivas y de respuesta",
-          "key_points": [
-            "Reconoce las causas principales de incendios en el trabajo",
-            "Identifica medidas preventivas para evitar incendios",
-            "Aplica procedimientos de evacuación en caso de emergencia",
-            "Utiliza correctamente equipos contra incendios"
-          ],
-          "theme_keywords": [
-            "incendio",
-            "fuego",
-            "extintor",
-            "prevención",
-            "combustión",
-            "triángulo del fuego",
-            "evacuación",
-            "emergencia",
-            "equipos"
-          ]
-        }
-      ],
-      "metadata": {
-        "total_sessions": 3,
-        "total_files": 3,
-        "created_at": "2025-07-28",
-        "last_updated": "2025-07-28"
-      }
+      "name": "Seguridad contra Incendios",
+      "specialist_role": "Instructor de Seguridad Industrial",
+      "description": "Curso completo sobre prevención y respuesta a incendios en entornos industriales y comerciales"
     },
     {
-      "id": "PER001",
-      "name": "Operación de Equipos de Perforación",
-      "description": "Curso completo de perforación con múltiples sesiones de capacitación",
-      "specialist_role": "Especialista en operación de equipos de perforación",
-      "vector_store_id": "vs_perforacion_equipos_2025",
-      "sessions": [
-        {
-          "id": "sesion01",
-          "name": "Fundamentos de Perforación",
-          "learning_objective": "El estudiante identifica los componentes principales de un equipo de perforación y explica su función en el proceso",
-          "key_points": [
-            "Comprende qué es un equipo de perforación y sus aplicaciones",
-            "Identifica los componentes principales del equipo de perforación",
-            "Explica la función de cada componente en el proceso",
-            "Relaciona el funcionamiento de los componentes para lograr la perforación efectiva"
-          ],
-          "theme_keywords": [
-            "perforación",
-            "equipo",
-            "componentes",
-            "fundamentos",
-            "mecanismo",
-            "funcionamiento",
-            "aplicaciones",
-            "proceso"
-          ]
-        },
-        {
-          "id": "sesion02",
-          "name": "Técnicas de Perforación",
-          "learning_objective": "El estudiante aplica técnicas de perforación según el tipo de terreno y objetivo",
-          "key_points": [
-            "Reconoce diferentes tipos de técnicas de perforación",
-            "Selecciona la técnica apropiada según el terreno",
-            "Aplica procedimientos de seguridad en perforación",
-            "Evalúa la eficiencia de la técnica utilizada"
-          ],
-          "theme_keywords": [
-            "técnicas",
-            "perforación",
-            "terreno",
-            "métodos",
-            "selección",
-            "eficiencia",
-            "procedimientos",
-            "seguridad"
-          ]
-        },
-        {
-          "id": "sesion03",
-          "name": "Mantenimiento de Equipos de Perforación",
-          "learning_objective": "El estudiante realiza mantenimiento preventivo y correctivo en equipos de perforación",
-          "key_points": [
-            "Identifica componentes que requieren mantenimiento regular",
-            "Aplica procedimientos de mantenimiento preventivo",
-            "Diagnostica problemas comunes en equipos de perforación",
-            "Ejecuta mantenimiento correctivo básico"
-          ],
-          "theme_keywords": [
-            "mantenimiento",
-            "preventivo",
-            "correctivo",
-            "equipos",
-            "perforación",
-            "diagnóstico",
-            "componentes",
-            "procedimientos",
-            "problemas"
-          ]
-        }
-      ],
-      "metadata": {
-        "total_sessions": 3,
-        "total_files": 3,
-        "created_at": "2025-07-28",
-        "last_updated": "2025-07-28"
-      }
+      "id": "SSO002", 
+      "name": "Primeros Auxilios",
+      "specialist_role": "Instructor de Primeros Auxilios",
+      "description": "Capacitación en técnicas básicas de primeros auxilios y respuesta a emergencias médicas"
+    },
+    {
+      "id": "SSO003",
+      "name": "Evacuación de Emergencias",
+      "specialist_role": "Coordinador de Seguridad",
+      "description": "Procedimientos y protocolos para evacuación segura en situaciones de emergencia"
     }
   ]
 } 

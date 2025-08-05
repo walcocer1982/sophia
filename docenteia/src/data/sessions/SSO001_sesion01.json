@@ -1,69 +1,66 @@
 {
-  "curso": "SSO001",
-  "sesion": "sesion01",
-  "nombre": "IPERC - Identificación de Peligros, Evaluación de Riesgos y Controles",
-  "objetivo": "El estudiante identifica peligros en una situación laboral, evalúa los riesgos asociados y propone controles adecuados para prevenir accidentes",
+  "id": "sesion01",
+  "name": "Fundamentos de Seguridad contra Incendios",
+  "learning_objective": "El estudiante identifica los principios básicos de la seguridad contra incendios y comprende los fundamentos de la prevención",
+  "key_points": [
+    "Comprende qué es el fuego y cómo se origina",
+    "Identifica los elementos del triángulo del fuego",
+    "Reconoce las clases de fuego y sus características",
+    "Aplica principios básicos de prevención de incendios"
+  ],
   "momentos": [
     {
-      "momento": "Saludo (exposición del aprendizaje esperado y los puntos clave)",
-      "instrucciones_docenteia": "Presentar el objetivo de la sesión IPERC y los puntos clave a desarrollar",
+      "momento": "Introducción al Fuego",
       "preguntas": [
-        "¿Qué sabes sobre identificación de peligros en el trabajo?",
-        "¿Has identificado algún peligro en tu entorno laboral?",
-        "¿Qué esperas aprender sobre evaluación de riesgos?"
-      ]
-    },
-    {
-      "momento": "Conexión",
-      "instrucciones_docenteia": "Narrar una situación laboral para conectar con experiencias previas",
-      "historia": "En una fábrica de producción, un trabajador está operando una máquina sin las protecciones adecuadas. ¿Qué peligros identificas en esta situación? ¿Qué riesgos podrían existir?",
-      "preguntas": [
-        "¿Qué elementos de riesgo identificas en esta situación?",
-        "¿Qué podría salir mal en este escenario?",
-        "¿Cómo se relaciona esto con tu experiencia laboral?"
-      ]
-    },
-    {
-      "momento": "Adquisición",
-      "instrucciones_docenteia": "Explicar los conceptos de IPERC",
-      "contenido_tecnico": [
-        "IPERC significa: Identificación de Peligros, Evaluación de Riesgos y Controles",
-        "PELIGRO: fuente, situación o acto con potencial de causar daño",
-        "RIESGO: combinación de la probabilidad de ocurrencia y la severidad del daño",
-        "CONTROL: medida implementada para eliminar o reducir el riesgo"
+        "¿Qué sabes sobre el fuego y cómo se origina?",
+        "¿Has presenciado alguna vez un incendio o situación relacionada con fuego?",
+        "¿Qué esperas aprender sobre la prevención de incendios?"
       ],
-      "preguntas": [
-        "¿Qué diferencia hay entre peligro y riesgo?",
-        "¿Cómo se evalúa la probabilidad de un riesgo?",
-        "¿Qué tipos de controles conoces?"
+      "contenido_tecnico": [
+        "El fuego es una reacción química de combustión",
+        "Se produce cuando se combinan combustible, oxígeno y calor",
+        "Es una herramienta útil pero también un peligro potencial"
       ]
     },
     {
-      "momento": "Aplicación",
-      "instrucciones_docenteia": "Presentar un caso práctico para aplicar IPERC",
-      "caso": "En un taller de mantenimiento, un trabajador debe cambiar una lámpara en altura. ¿Cómo aplicarías el método IPERC en esta situación?",
+      "momento": "El Triángulo del Fuego",
       "preguntas": [
-        "¿Qué peligros identificas en este caso?",
-        "¿Cómo evaluarías los riesgos?",
-        "¿Qué controles propondrías?"
+        "¿Puedes identificar los tres elementos necesarios para que exista el fuego?",
+        "¿Cómo crees que se puede controlar o extinguir un incendio?",
+        "¿Qué elemento del triángulo del fuego es más fácil de controlar?"
+      ],
+      "contenido_tecnico": [
+        "Combustible: material que puede quemarse",
+        "Oxígeno: necesario para la combustión",
+        "Calor: energía que inicia y mantiene la reacción"
       ]
     },
     {
-      "momento": "Discusión",
-      "instrucciones_docenteia": "Facilitar la comparación de diferentes enfoques de control",
+      "momento": "Clases de Fuego",
       "preguntas": [
-        "¿Qué estrategia de control prefieres y por qué?",
-        "¿Hay situaciones donde una estrategia es mejor que otra?",
-        "¿Qué limitaciones tiene cada enfoque?"
+        "¿Sabes que existen diferentes tipos de fuego?",
+        "¿Has visto extintores con diferentes colores o etiquetas?",
+        "¿Qué tipo de fuego crees que es más común en el trabajo?"
+      ],
+      "contenido_tecnico": [
+        "Clase A: Materiales sólidos (madera, papel, tela)",
+        "Clase B: Líquidos inflamables (gasolina, aceite)",
+        "Clase C: Equipos eléctricos energizados",
+        "Clase D: Metales combustibles"
       ]
     },
     {
-      "momento": "Reflexión",
-      "instrucciones_docenteia": "Guiar la reflexión sobre lo aprendido y su aplicación práctica",
+      "momento": "Prevención de Incendios",
       "preguntas": [
-        "¿Qué concepto te quedó más claro?",
-        "¿Cómo aplicarás IPERC en tu trabajo?",
-        "¿Qué más te gustaría aprender sobre evaluación de riesgos?"
+        "¿Qué medidas preventivas conoces para evitar incendios?",
+        "¿Cómo crees que se puede mantener un ambiente de trabajo seguro?",
+        "¿Qué harías si detectas un riesgo de incendio en tu área de trabajo?"
+      ],
+      "contenido_tecnico": [
+        "Mantener orden y limpieza en el área de trabajo",
+        "No sobrecargar circuitos eléctricos",
+        "Almacenar materiales inflamables correctamente",
+        "Reportar condiciones inseguras inmediatamente"
       ]
     }
   ]
