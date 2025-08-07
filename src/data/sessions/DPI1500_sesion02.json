@@ -1,0 +1,88 @@
+{
+  "id": "sesion02",
+  "name": "Mantenimiento Preventivo y Resolución de Problemas - DPI 1500 Sandvik",
+  "learning_objective": "El operador identifica problemas comunes del equipo DPI 1500 Sandvik y aplica procedimientos de mantenimiento preventivo y resolución de fallas",
+  "key_points": [
+    "Identificación de problemas comunes del equipo",
+    "Procedimientos de mantenimiento preventivo",
+    "Diagnóstico de fallas básicas",
+    "Protocolos de emergencia y parada segura",
+    "Documentación de mantenimiento y reportes"
+  ],
+  "momentos": [
+    {
+      "momento": "Saludo (exposición del aprendizaje esperado y los puntos clave)",
+      "instrucciones_docenteia": "Presentar el objetivo de la sesión sobre mantenimiento preventivo y resolución de problemas del DPI 1500 Sandvik",
+      "preguntas": [
+        "¿Qué problemas has experimentado con equipos de perforación? (Si no tienes experiencia, piensa en problemas generales de máquinas)",
+        "¿Qué tipo de mantenimiento realizas en tus equipos actuales? (Si no tienes experiencia, piensa en mantenimiento básico que conoces)",
+        "¿Has tenido que resolver alguna falla durante la operación? (Si no, piensa en cómo resolverías un problema básico)"
+      ]
+    },
+    {
+      "momento": "Conexión",
+      "instrucciones_docenteia": "Narrar una situación de falla real para conectar con experiencias previas",
+      "historia": "Imagina que estás aprendiendo sobre el DPI 1500 Sandvik y tu instructor te cuenta esta situación: Durante una perforación crítica, el operador nota que la presión hidráulica está fluctuando anormalmente y el equipo comienza a vibrar más de lo normal. El supervisor le dice que debe completar la perforación porque hay un plazo ajustado. ¿Qué crees que debería hacer el operador en esta situación? ¿Por qué es importante detener la operación ante señales de falla, incluso si hay presión por completar el trabajo?",
+      "preguntas": [
+        "¿Qué señales de alarma identificas en esta situación? (Piensa en qué te diría que algo está mal)",
+        "¿Qué procedimiento de emergencia crees que debería seguir el operador? (Usa tu sentido común)",
+        "¿Por qué crees que es importante detener la operación ante señales de falla? (Piensa en las consecuencias)",
+        "¿Qué consecuencias crees que podría tener continuar operando con fallas? (Usa tu lógica)"
+      ]
+    },
+    {
+      "momento": "Adquisición",
+      "instrucciones_docenteia": "Explicar los problemas más comunes del DPI 1500 Sandvik y sus causas",
+      "contenido_tecnico": [
+        "PROBLEMAS HIDRÁULICOS: Fugas de aceite, presión baja, ruidos anormales - Causas: desgaste de sellos, contaminación del fluido, filtros obstruidos",
+        "PROBLEMAS DE PERFORACIÓN: Vibración excesiva, desgaste prematuro de brocas - Causas: parámetros incorrectos, brocas desgastadas, terreno inestable",
+        "PROBLEMAS ELÉCTRICOS: Fallas de arranque, luces de advertencia - Causas: conexiones sueltas, batería débil, sensores defectuosos",
+        "PROBLEMAS DE ENFRIAMIENTO: Sobrecalentamiento del motor - Causas: nivel bajo de refrigerante, radiador obstruido, termostato defectuoso",
+        "PROBLEMAS DE LUBRICACIÓN: Ruidos metálicos, desgaste acelerado - Causas: nivel bajo de aceite, aceite contaminado, filtros obstruidos",
+        "PROBLEMAS DE ESTABILIZACIÓN: Movimiento inestable durante perforación - Causas: neumáticos desgastados, sistema hidráulico defectuoso",
+        "INDICADORES DE FALLA: Luces de advertencia, alarmas sonoras, vibraciones anormales, cambios en el rendimiento",
+        "PROCEDIMIENTOS DE DIAGNÓSTICO: Verificación visual, monitoreo de indicadores, pruebas de funcionamiento"
+      ],
+      "preguntas": [
+        "¿Cuál crees que es el problema más crítico que puede afectar la seguridad? (Piensa en lo que podría causar un accidente)",
+        "¿Por qué crees que es importante monitorear la presión hidráulica constantemente? (Imagina qué pasaría si falla)",
+        "¿Qué indicadores crees que te alertarían de un problema de lubricación? (Piensa en señales que verías)",
+        "¿Cómo crees que diferenciarías una vibración normal de una anormal? (Usa tu sentido común)",
+        "¿Qué crees que pasaría si ignoras una luz de advertencia? (Piensa en las consecuencias)",
+        "¿Por qué crees que es fundamental el sistema de enfriamiento? (Imagina qué pasaría si se sobrecalienta)"
+      ]
+    },
+    {
+      "momento": "Aplicación",
+      "instrucciones_docenteia": "Presentar procedimientos de mantenimiento preventivo y resolución de problemas",
+      "caso": "Imagina que estás aprendiendo sobre el DPI 1500 Sandvik y tu instructor te presenta este escenario: Eres el operador responsable del equipo. Durante tu inspección diaria, encuentras que el nivel de aceite hidráulico está por debajo del mínimo recomendado y hay una pequeña fuga cerca del cilindro principal. Tu turno comienza en 30 minutos y hay perforaciones programadas. ¿Cuál crees que sería tu plan de acción? ¿Qué verificaciones adicionales crees que deberías realizar? ¿Cómo crees que documentarías este problema? ¿Qué medidas preventivas crees que implementarías?",
+      "preguntas": [
+        "¿Cuál crees que sería tu primera acción al detectar la fuga de aceite? (Piensa en lo que harías primero)",
+        "¿Qué verificaciones adicionales crees que deberías realizar antes de operar? (Usa tu sentido común)",
+        "¿Cómo crees que documentarías este problema para el siguiente turno? (Piensa en qué información sería importante)",
+        "¿Qué medidas preventivas crees que implementarías para evitar futuras fugas? (Usa tu lógica)",
+        "¿En qué momento crees que decidirías no operar el equipo? (Piensa en qué sería demasiado peligroso)"
+      ]
+    },
+    {
+      "momento": "Discusión",
+      "instrucciones_docenteia": "Facilitar la comparación de diferentes estrategias de mantenimiento y resolución de problemas",
+      "preguntas": [
+        "¿Qué estrategia de mantenimiento preventivo prefieres y por qué?",
+        "¿Hay situaciones donde un enfoque de resolución es mejor que otro?",
+        "¿Qué limitaciones tiene cada método de diagnóstico?",
+        "¿Cómo priorizarías las tareas de mantenimiento?"
+      ]
+    },
+    {
+      "momento": "Reflexión",
+      "instrucciones_docenteia": "Guiar la reflexión sobre la importancia del mantenimiento preventivo y la seguridad",
+      "preguntas": [
+        "¿Qué concepto sobre mantenimiento preventivo te quedó más claro?",
+        "¿Cómo cambiará tu forma de realizar inspecciones después de esta sesión?",
+        "¿Qué más te gustaría aprender sobre diagnóstico de fallas?",
+        "¿Qué protocolos de documentación implementarías en tu trabajo?"
+      ]
+    }
+  ]
+} 

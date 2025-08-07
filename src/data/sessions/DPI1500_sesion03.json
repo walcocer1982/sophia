@@ -1,0 +1,88 @@
+{
+  "id": "sesion03",
+  "name": "Operación Avanzada y Optimización del DPI 1500 Sandvik",
+  "learning_objective": "El operador domina técnicas avanzadas de operación y optimización del rendimiento del equipo DPI 1500 Sandvik en diferentes condiciones de trabajo",
+  "key_points": [
+    "Técnicas avanzadas de perforación",
+    "Optimización de parámetros operativos",
+    "Adaptación a diferentes tipos de terreno",
+    "Maximización de la productividad",
+    "Mantenimiento predictivo avanzado"
+  ],
+  "momentos": [
+    {
+      "momento": "Saludo (exposición del aprendizaje esperado y los puntos clave)",
+      "instrucciones_docenteia": "Presentar el objetivo de la sesión sobre técnicas avanzadas de operación y optimización del DPI 1500 Sandvik",
+      "preguntas": [
+        "¿Qué técnicas avanzadas de perforación conoces? (Si no tienes experiencia, piensa en cómo optimizarías cualquier proceso)",
+        "¿Qué parámetros crees que son importantes para optimizar el rendimiento? (Usa tu sentido común)",
+        "¿Cómo crees que se adapta un equipo a diferentes condiciones? (Piensa en ejemplos de la vida diaria)"
+      ]
+    },
+    {
+      "momento": "Conexión",
+      "instrucciones_docenteia": "Narrar una situación de optimización real para conectar con experiencias previas",
+      "historia": "Imagina que estás aprendiendo sobre el DPI 1500 Sandvik y tu instructor te cuenta esta situación: Un operador experimentado debe perforar en un terreno muy duro donde las brocas se desgastan rápidamente. El supervisor le pide que optimice la perforación para reducir costos y tiempo. ¿Qué crees que debería hacer el operador para optimizar el rendimiento? ¿Por qué es importante adaptar los parámetros según el tipo de terreno? ¿Cómo crees que se puede maximizar la productividad sin comprometer la seguridad?",
+      "preguntas": [
+        "¿Qué elementos de optimización identificas en esta situación? (Piensa en qué se puede mejorar)",
+        "¿Cuál crees que sería tu primera acción como operador? (Usa tu sentido común)",
+        "¿Por qué crees que es importante adaptar los parámetros al terreno? (Piensa en ejemplos)",
+        "¿Qué consecuencias crees que podría tener no optimizar la perforación? (Usa tu lógica)"
+      ]
+    },
+    {
+      "momento": "Adquisición",
+      "instrucciones_docenteia": "Explicar las técnicas avanzadas de operación y optimización del DPI 1500 Sandvik",
+      "contenido_tecnico": [
+        "TÉCNICAS AVANZADAS DE PERFORACIÓN: Perforación direccional, control de profundidad, ajuste de velocidad según dureza",
+        "OPTIMIZACIÓN DE PARÁMETROS: Presión de perforación, velocidad de rotación, flujo de refrigerante, selección de brocas",
+        "ADAPTACIÓN A DIFERENTES TERRENOS: Roca dura, roca blanda, terreno inestable, condiciones húmedas o secas",
+        "MAXIMIZACIÓN DE PRODUCTIVIDAD: Secuencia de perforación eficiente, cambio rápido de brocas, coordinación con otros equipos",
+        "MANTENIMIENTO PREDICTIVO: Monitoreo de desgaste, análisis de vibraciones, programación de mantenimiento basada en uso",
+        "CONTROL DE CALIDAD: Verificación de dimensiones, control de desviación, documentación de resultados",
+        "GESTIÓN DE COMBUSTIBLE: Optimización de consumo, programación de reabastecimiento, monitoreo de eficiencia",
+        "ANÁLISIS DE DATOS: Registro de parámetros, análisis de tendencias, identificación de oportunidades de mejora"
+      ],
+      "preguntas": [
+        "¿Cuál crees que es la técnica más importante para optimizar la perforación? (Piensa en qué tendría mayor impacto)",
+        "¿Por qué crees que es importante adaptar los parámetros al terreno? (Imagina perforar en diferentes condiciones)",
+        "¿Qué indicadores crees que son esenciales para maximizar la productividad? (Piensa en qué te diría el rendimiento)",
+        "¿Cómo crees que funciona el mantenimiento predictivo? (Usa tu sentido común)",
+        "¿Qué crees que pasaría si no optimizas los parámetros de perforación? (Piensa en las consecuencias)",
+        "¿Por qué crees que es fundamental el análisis de datos? (Imagina cómo mejorarías cualquier proceso)"
+      ]
+    },
+    {
+      "momento": "Aplicación",
+      "instrucciones_docenteia": "Presentar casos prácticos de optimización y técnicas avanzadas de operación",
+      "caso": "Imagina que estás aprendiendo sobre el DPI 1500 Sandvik y tu instructor te presenta este escenario: Eres el operador del equipo en una mina donde debes perforar en un terreno mixto (roca dura y blanda). Tu supervisor te pide que optimices la perforación para maximizar la productividad sin comprometer la calidad. ¿Cuál crees que sería tu secuencia de acciones? ¿Cómo crees que adaptarías los parámetros según el terreno? ¿Qué información crees que deberías registrar para análisis futuro? ¿Cómo crees que coordinarías con otros equipos para maximizar la eficiencia?",
+      "preguntas": [
+        "¿Cuál crees que sería tu primera acción al analizar el terreno mixto? (Piensa en lo que harías primero)",
+        "¿Cómo crees que adaptarías los parámetros según el tipo de roca? (Usa tu sentido común)",
+        "¿Qué información específica crees que deberías registrar para análisis? (Piensa en qué datos serían útiles)",
+        "¿Cómo crees que coordinarías con otros equipos para maximizar la eficiencia? (Usa tu lógica)",
+        "¿Qué medidas crees que tomarías para optimizar la productividad? (Piensa en mejoras posibles)"
+      ]
+    },
+    {
+      "momento": "Discusión",
+      "instrucciones_docenteia": "Facilitar la comparación de diferentes enfoques de optimización y técnicas avanzadas",
+      "preguntas": [
+        "¿Qué estrategia de optimización prefieres y por qué? (Piensa en qué enfoque te parece más efectivo)",
+        "¿Hay situaciones donde un enfoque es mejor que otro? (Usa tu sentido común)",
+        "¿Qué limitaciones crees que tiene cada técnica de optimización? (Piensa en posibles desventajas)",
+        "¿Cómo crees que mejorarías los procedimientos actuales? (Usa tu creatividad)"
+      ]
+    },
+    {
+      "momento": "Reflexión",
+      "instrucciones_docenteia": "Guiar la reflexión sobre la importancia de la optimización y técnicas avanzadas",
+      "preguntas": [
+        "¿Qué concepto sobre optimización de perforación te quedó más claro? (Piensa en lo que aprendiste)",
+        "¿Cómo crees que cambiará tu forma de operar equipos después de esta sesión? (Usa tu imaginación)",
+        "¿Qué más te gustaría aprender sobre técnicas avanzadas? (Piensa en áreas de interés)",
+        "¿Qué mejoras crees que implementarías en tu área de trabajo? (Usa tu creatividad)"
+      ]
+    }
+  ]
+} 
