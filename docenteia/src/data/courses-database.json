@@ -17,6 +17,12 @@
       "name": "Evacuación de Emergencias",
       "specialist_role": "Coordinador de Seguridad",
       "description": "Procedimientos y protocolos para evacuación segura en situaciones de emergencia"
+    },
+    {
+      "id": "DPI1500",
+      "name": "Operación del Equipo DPI 1500 Sandvik",
+      "specialist_role": "Instructor de Operación de Equipos Mineros",
+      "description": "Curso completo para la operación segura y eficiente del equipo de perforación DPI 1500 Sandvik, incluyendo mantenimiento preventivo y protocolos de emergencia"
     }
   ]
 } 
