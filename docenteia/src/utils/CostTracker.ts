@@ -70,6 +70,11 @@ export class CostTracker {
 
     const price = prices[model] || prices['gpt-4o-mini'];
     
+    if (!price) {
+      this.logger.warn(`Precio no encontrado para modelo ${model}, usando gpt-4o-mini`);
+      return 0;
+    }
+    
     const inputCost = (inputTokens / 1000) * price.input;
     const outputCost = (outputTokens / 1000) * price.output;
     

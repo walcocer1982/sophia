@@ -48,7 +48,9 @@ class ChatInteractive {
       console.log('✅ SessionStore inicializado');
 
       console.log('✅ Configuración verificada');
-      console.log('📚 Cursos disponibles: SSO001 (Seguridad contra Incendios)');
+      console.log('📚 Cursos disponibles:');
+      console.log('   - SSO001 (Seguridad contra Incendios)');
+      console.log('   - DPI1500 (Operación del Equipo DPI 1500 Sandvik)');
       console.log('📝 Sesiones disponibles: sesion01, sesion02, sesion03\n');
 
       await this.showMenu();
@@ -104,10 +106,10 @@ class ChatInteractive {
    */
   private async startNewSession(): Promise<void> {
     console.log('\n🚀 INICIANDO NUEVA SESIÓN');
-    console.log('Cursos disponibles: SSO001');
+    console.log('Cursos disponibles: SSO001, DPI1500');
     console.log('Sesiones disponibles: sesion01, sesion02, sesion03');
 
-    this.rl.question('\nIngresa el ID del curso (ej: SSO001): ', async (courseId) => {
+    this.rl.question('\nIngresa el ID del curso (ej: DPI1500): ', async (courseId) => {
       this.rl.question('Ingresa el ID de la sesión (ej: sesion01): ', async (sessionId) => {
         try {
           console.log('\n🔄 Iniciando sesión...');

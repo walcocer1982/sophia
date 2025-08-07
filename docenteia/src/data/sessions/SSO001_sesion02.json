@@ -3,14 +3,19 @@
   "sesion": "sesion02",
   "nombre": "Procedimientos de Seguridad en el Trabajo",
   "objetivo": "El estudiante aplica procedimientos de seguridad en situaciones específicas del trabajo",
+  "key_points": [
+    "Comprende qué son los procedimientos de seguridad y su importancia",
+    "Identifica los elementos básicos de un procedimiento de seguridad",
+    "Reconoce los Equipos de Protección Personal (EPP) y su selección",
+    "Aplica procedimientos de seguridad en situaciones específicas del trabajo",
+    "Evalúa la efectividad de diferentes procedimientos según el contexto"
+  ],
   "momentos": [
     {
       "momento": "Saludo (exposición del aprendizaje esperado y los puntos clave)",
       "instrucciones_docenteia": "Presentar el objetivo de la sesión sobre procedimientos de seguridad",
       "preguntas": [
-        "¿Qué procedimientos de seguridad conoces?",
-        "¿Has seguido algún protocolo de seguridad en tu trabajo?",
-        "¿Qué esperas aprender sobre procedimientos de seguridad?"
+        "¿Qué esperas aprender sobre procedimientos de seguridad en esta sesión?"
       ]
     },
     {
@@ -19,8 +24,7 @@
       "historia": "En una obra de construcción, un trabajador debe realizar trabajos en altura. ¿Qué procedimientos de seguridad debería seguir? ¿Qué equipos de protección necesitaría?",
       "preguntas": [
         "¿Qué elementos de seguridad identificas en esta situación?",
-        "¿Qué podría salir mal si no se siguen los procedimientos?",
-        "¿Has presenciado alguna situación similar?"
+        "¿Has presenciado alguna situación similar en tu trabajo?"
       ]
     },
     {
