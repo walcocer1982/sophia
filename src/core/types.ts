@@ -11,7 +11,14 @@ export const PedagogicalResponseSchema = z.object({
   razon_avance: z.string().min(5, "La razón debe tener al menos 5 caracteres"),
   siguiente_momento: z.string(),
   preguntas_pendientes: z.number().int().min(0, "Las preguntas pendientes no pueden ser negativas"),
-  preguntas_respondidas: z.number().int().min(0, "Las preguntas respondidas no pueden ser negativas")
+  preguntas_respondidas: z.number().int().min(0, "Las preguntas respondidas no pueden ser negativas"),
+  // ✨ NUEVOS CAMPOS PARA FEEDBACK Y VALIDACIÓN
+  feedback_tipo: z.enum(['POSITIVO', 'CONSTRUCTIVO', 'CORRECTIVO']).optional(),
+  respuesta_valida: z.boolean().optional(),
+  criterios_cumplidos: z.array(z.string()).optional(),
+  nueva_pregunta: z.string().nullable().optional(),
+  pistas_graduales: z.array(z.string()).nullable().optional(),
+  intentos_restantes: z.number().int().min(0).nullable().optional()
 });
 
 export const SessionInfoSchema = z.object({
@@ -40,16 +47,25 @@ export interface Session {
   name: string;
   learning_objective: string;
   key_points: string[];
-  momentos: Momento[];
 }
 
 export interface Momento {
   momento: string;
-  preguntas: string[];
+  preguntas?: string[];
+  preguntas_evaluacion?: Array<{
+    id_pregunta?: string;
+    pregunta: string;
+    tipo: string;
+    objetivo: string;
+    respuestas_aceptables: string[];
+  }>;
   contenido_tecnico?: string[];
   historia?: string;
   caso?: string;
   instrucciones_docenteia?: string;
+  objetivo?: string;
+  contenido_clave?: string[];
+  contenido_tecnico_detallado?: any[];
 }
 
 export interface SessionData {
@@ -63,10 +79,27 @@ export interface SessionData {
   preguntasRespondidas: string[];
   startTime: Date;
   lastActivity: Date;
-  // 🆕 Sistema de memoria para evitar repeticiones
-  respuestasAnteriores?: string[];
+  // 🆕 Estado pedagógico
   contenidoNarrado?: string[];
-  contadorInteracciones?: number;
+  // 🆕 Palabras clave derivadas por momento para clasificación temática
+  momentKeywords?: string[][];
+  // 🆕 Métricas por momento
+  momentMetrics?: Array<{
+    contentChunksTotal: number;
+    contentChunksShown: number;
+    definitionsTotal: number;
+    definitionsShown: number;
+    questionsTotal: number;
+    questionsAsked: number;
+  }>;
+  // 🆕 Políticas de sesión (configurables por instancia)
+  policies?: {
+    noSpoilers?: boolean;
+    hintStyle?: 'ABSTRACT' | 'KEYWORD';
+    vaguePhrases?: string[];
+    ackPhrases?: string[];
+    forbiddenPhrases?: string[];
+  };
 }
 
 // 🔧 TIPOS DE CONFIGURACIÓN
@@ -82,4 +115,19 @@ export interface CostTrackingConfig {
   enabled: boolean;
   maxCostPerSession: number;
   currency: string;
-} 
+}
+
+// 🧠 INTERFACES PARA ANÁLISIS PEDAGÓGICO
+export interface ResponseAnalysis {
+  contentScore: number;
+  relevanceScore: number;
+  completenessScore: number;
+  pedagogicalValue: number;
+  feedback: string;
+  extractedConcepts: string[];
+  extractedInsights: string[];
+  type: 'CORRECT' | 'PARTIALLY_CORRECT' | 'ATTEMPTED' | 'EVADED';
+  confidence: number;
+  // Motivo opcional de clasificación (para trazabilidad: vaga, incoherente, etc.)
+  reasonCode?: 'VAGUE' | 'INCOHERENT' | 'OFF_TOPIC' | 'THRESHOLD';
+}

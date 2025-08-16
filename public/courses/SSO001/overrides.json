@@ -1,0 +1,9 @@
+{
+  "steps": {
+    "M3-Q02": { "type": "listado", "k": 4 },
+    "M4-Q01": { "type": "aplicacion", "requiresJustification": true }
+  }
+}
+
+
+

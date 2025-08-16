@@ -1,0 +1,51 @@
+{
+  "language": {
+    "stopwords": ["el","la","los","las","un","una","unos","unas","de","en","y","o","a","para","con","sobre","que","es","son","del","al","por","se","como","mas","más","menos","no","si","sí","qué","cuales","cuáles"]
+  },
+  "thresholds": {
+    "conceptual": { "min": 1 },
+    "identificacion": { "min": 1 },
+    "listado": { "kDefault": 2 },
+    "aplicacion": { "requiresJustification": true },
+    "metacognitiva": { "min": 1 },
+    "experiencial": { "min": 1 },
+    "reflexiva": { "min": 1 }
+  },
+  "hints": {
+    "wordLimits": [18, 35, 60],
+    "escalateAfterAttempts": [1, 2, 3]
+  },
+  "advance": {
+    "allowForcedOn": [],
+    "maxAttemptsBeforeForce": 999
+  },
+  "vague": {
+    "minUsefulTokens": 3,
+    "maxStopwordRatio": 0.6,
+    "echoOverlap": 0.7,
+    "repeatSimilarity": 0.8,
+    "vagueAttemptsBeforeAB": 2,
+    "vagueAttemptsBeforeExplain": 3,
+    "simplifiedAskMaxWords": 10
+  },
+  "typeMap": {
+    "abierta": "metacognitiva",
+    "diagnostica": "identificacion",
+    "diagnóstica": "identificacion",
+    "aplicacion_practica": "aplicacion",
+    "aplicacion": "aplicacion",
+    "analisis": "conceptual",
+    "analisis_comparativo": "conceptual",
+    "analisis_critico": "conceptual",
+    "seleccion_justificada": "aplicacion",
+    "planificacion_aplicacion": "aplicacion",
+    "autoevaluacion": "reflexiva",
+    "identificacion": "identificacion",
+    "conceptual": "conceptual",
+    "listado": "listado",
+    "reflexiva": "reflexiva",
+    "experiencial": "experiencial"
+  }
+}
+
+
