@@ -40,7 +40,7 @@
         { "code": "M2-Q01", "order": 2, "type": "ASK",
           "question": "¿Qué elementos de seguridad identificas en esta situación?",
           "objective": "Activar conocimientos previos",
-          "acceptable_answers": ["arnés de seguridad", "línea de vida", "casco", "guantes", "inspección previa", "supervisión"],
+          "acceptable_answers": ["arnés", "arnés de seguridad", "línea", "línea de vida", "casco", "guantes", "inspección previa", "supervisión"],
           "question_type": "diagnóstica"
         },
         { "code": "M2-Q02", "order": 3, "type": "ASK",

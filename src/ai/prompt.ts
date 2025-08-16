@@ -43,7 +43,8 @@ export function buildSystemPrompt(ctx: DocentePromptContext): string {
     'Mantén continuidad con el último turno: si ya respondió, no repitas la misma pregunta; continúa dentro del paso según el plan.',
     'Evita repetir el mismo ejemplo en turnos consecutivos; varíalo o adáptalo al contexto de la respuesta.',
     'No repitas exactamente la misma idea en dos turnos seguidos; añade un matiz o detalle nuevo.',
-    'Solo avanza cuando se cumpla el criterio de cierre del paso actual (si aplica).'
+    'Solo avanza cuando se cumpla el criterio de cierre del paso actual (si aplica).',
+    'En acciones ask, hint, feedback, ask_simple y ask_options no re-narres el caso ni describas la situación inicial; si fuera imprescindible, referencia en UNA sola frase sin repetir detalles. Reserva la narración extensa solo para explain.'
   ].filter(Boolean).join(' ');
   return rules;
 }
@@ -92,7 +93,7 @@ export function buildUserPrompt(ctx: DocentePromptContext): string {
       if (!ctx.questionText) lines.push('Falta la pregunta.');
       pushIf(ctx.questionText, `Pregunta: ${ctx.questionText}`);
       lines.push('Tarea: enmarca brevemente y cierra con la PREGUNTA EXACTA tal cual. No añadas contenido nuevo.');
-      lines.push('Reglas: si el estudiante ya respondió esta pregunta en el turno previo, no la repitas; produce una transición breve y continúa dentro del paso sin avanzar al siguiente hasta cumplir el criterio de cierre.');
+      lines.push('Reglas: si el estudiante ya respondió esta pregunta en el turno previo, no la repitas; produce una transición breve y continúa dentro del paso sin avanzar al siguiente hasta cumplir el criterio de cierre. No re-narres el caso ni repitas la historia.');
       break;
     }
 
@@ -109,7 +110,7 @@ export function buildUserPrompt(ctx: DocentePromptContext): string {
         `Tarea: primero escribe UNA pista (${limit} palabras aprox., sin signos de interrogación) orientada al OBJETIVO (no listar soluciones ni definiciones generales). ` +
         `Luego, en una línea aparte, UNA sola micro‑pregunta (≤8 palabras) centrada en el objetivo o el primer faltante. Nunca devuelvas solo preguntas.`
       );
-      lines.push('Reglas: evita repetir la misma micro‑pregunta usada en el turno previo (usa Historial reciente).');
+      lines.push('Reglas: evita repetir la misma micro‑pregunta usada en el turno previo (usa Historial reciente). No re‑narrar el caso.');
       break;
     }
 
@@ -120,7 +121,7 @@ export function buildUserPrompt(ctx: DocentePromptContext): string {
       if (opts.length) {
         lines.push(`Opciones (elige una): ${opts.join(' / ')}`);
       }
-      lines.push('Tarea: formula la elección de forma clara y breve.');
+      lines.push('Tarea: formula la elección de forma clara y breve. No re‑narrar el caso.');
       break;
     }
 
@@ -132,7 +133,7 @@ export function buildUserPrompt(ctx: DocentePromptContext): string {
         const labeled = items.map((s, i) => `${String.fromCharCode(65 + i)}) ${s}`);
         lines.push(`Opciones: ${labeled.join(' | ')}`);
       }
-      lines.push('Tarea: pide que elija una opción (A, B, C, …) y espera su selección.');
+      lines.push('Tarea: pide que elija una opción (A, B, C, …) y espera su selección. No re‑narrar el caso.');
       break;
     }
 
@@ -177,7 +178,7 @@ export function buildUserPrompt(ctx: DocentePromptContext): string {
         lines.push(
           `Tarea (feedback: ACCEPT): escribe hasta ${limit} frases: ` +
           `1) empieza con una frase de refuerzo específica citando 1–2 aciertos (usa Aciertos); ` +
-          `2) si procede, orienta brevemente el siguiente foco` + (allowQ ? '' : `, sin preguntas`) + `, sin revelar respuestas.`
+          `2) si procede, orienta brevemente el siguiente foco` + (allowQ ? '' : `, sin preguntas`) + `, sin revelar respuestas. No re‑narrar el caso.`
         );
       } else if (kind === 'PARTIAL') {
         lines.push(
@@ -191,14 +192,14 @@ export function buildUserPrompt(ctx: DocentePromptContext): string {
         lines.push(
           `Tarea (feedback: REFOCUS): escribe hasta ${limit} frases: ` +
           `1) ofrece ánimo (sin repetirlo si ya fue expresado) y señala con amabilidad el desvío; ` +
-          `2) redirige al criterio/objetivo central en forma concreta` + (allowQ ? '' : `, sin preguntas`) + `.`
+          `2) redirige al criterio/objetivo central en forma concreta` + (allowQ ? '' : `, sin preguntas`) + `. No re‑narrar el caso.`
         );
       } else {
         // HINT o evasiva
         lines.push(
           `Tarea (feedback: HINT): escribe ${limit} frases: ` +
           `1) normaliza la duda y anima a continuar (evita repetir empatía si ya fue usada en el turno previo); ` +
-          `2) da una pista concreta alineada al objetivo (usa Pistas de contenido o el primer Faltante); si el término es extremo/coloquial, reencuadra con lenguaje profesional.` + (allowQ ? '' : ` No incluyas preguntas.`)
+          `2) da una pista concreta alineada al objetivo (usa Pistas de contenido o el primer Faltante); si el término es extremo/coloquial, reencuadra con lenguaje profesional. No re‑narrar el caso.` + (allowQ ? '' : ` No incluyas preguntas.`)
         );
       }
       break;
