@@ -1,0 +1,17 @@
+{
+  "courses": [
+    {
+      "id": "SSO001",
+      "name": "SSO001",
+      "lessons": [
+        {
+          "id": "lesson02",
+          "name": "Lección 02",
+          "planUrl": "/courses/SSO001/lessons/lesson02.json"
+        }
+      ]
+    }
+  ]
+}
+
+

@@ -1,0 +1,21 @@
+{
+  "id": "SSO001",
+  "name": "Seguridad y Salud Ocupacional",
+  "version": "1.0.0",
+  "language": "es",
+  "objectives": [
+    "Identificar riesgos",
+    "Aplicar procedimientos"
+  ],
+  "specialist": {},
+  "lessons": [
+    {
+      "id": "lesson02",
+      "title": "Procedimientos de Seguridad",
+      "order": 2,
+      "path": "/courses/SSO001/lessons/lesson02.json"
+    }
+  ]
+}
+
+

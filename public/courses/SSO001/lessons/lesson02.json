@@ -1,0 +1,152 @@
+{
+  "meta": {
+    "lesson_id": "SSO001_lesson02",
+    "lesson_name": "Procedimientos de Seguridad",
+    "version": "1.0.0",
+    "language": "es",
+    "ordered": true,
+    "generated_at": "2025-08-14T00:00:00Z"
+  },
+  "moments": [
+    {
+      "code": "M1",
+      "order": 1,
+      "title": "Saludo",
+      "steps": [
+        { "code": "M1-EL01", "order": 1, "type": "EXPECTED_LEARNING", "items": [
+          "Comprender qué es un procedimiento de seguridad",
+          "Identificar sus componentes principales",
+          "Aplicar criterios básicos de selección de EPP"
+        ]},
+        { "code": "M1-KP01", "order": 2, "type": "KEY_POINTS", "items": [
+          "Qué es un procedimiento", "Por qué es importante", "Cómo se aplica"
+        ]},
+        { "code": "M1-N01", "order": 3, "type": "NARRATION", "text": "Bienvenida y objetivo de la sesión. Exploraremos qué son los procedimientos de seguridad y su relevancia en el trabajo." },
+        { "code": "M1-Q01", "order": 4, "type": "ASK",
+          "question": "¿Qué esperas aprender sobre procedimientos de seguridad en esta sesión?",
+          "objective": "Elicitar expectativas del estudiante",
+          "acceptable_answers": ["partes del procedimiento", "cómo se aplica", "importancia de seguirlos", "selección de EPP"],
+          "question_type": "metacognitiva"
+        }
+      ]
+    },
+    {
+      "code": "M2",
+      "order": 2,
+      "title": "Conexión",
+      "steps": [
+        { "code": "M2-N01", "order": 1, "type": "NARRATION",
+          "text": "Historia: En una obra, un trabajador debe instalar ventanas en el tercer piso. Recibe un arnés, pero no ha trabajado en altura antes." },
+        { "code": "M2-Q01", "order": 2, "type": "ASK",
+          "question": "¿Qué elementos de seguridad identificas en esta situación?",
+          "objective": "Activar conocimientos previos",
+          "acceptable_answers": ["arnés de seguridad", "línea de vida", "casco", "guantes", "inspección previa", "supervisión"],
+          "question_type": "diagnóstica"
+        },
+        { "code": "M2-Q02", "order": 3, "type": "ASK",
+          "question": "¿Qué podría pasar si no se siguen los procedimientos correctos?",
+          "objective": "Conciencia de riesgos",
+          "acceptable_answers": ["caídas", "lesiones", "accidentes", "sanciones", "multas"],
+          "question_type": "reflexiva"
+        }
+      ]
+    },
+    {
+      "code": "M3",
+      "order": 3,
+      "title": "Adquisición",
+      "steps": [
+        { "code": "M3-C01", "order": 1, "type": "CONTENT",
+          "title": "Definición de procedimiento de seguridad",
+          "body": [
+            "PROCEDIMIENTO DE SEGURIDAD: Secuencia ordenada y documentada de pasos específicos para realizar una tarea de forma segura, minimizando riesgos laborales"
+          ]
+        },
+        { "code": "M3-Q01", "order": 2, "type": "ASK",
+          "question": "¿Cómo definirías un procedimiento de seguridad con tus palabras?",
+          "objective": "Comprender la definición",
+          "acceptable_answers": ["secuencia documentada de pasos", "realizar una tarea de forma segura", "minimizar riesgos laborales"],
+          "question_type": "conceptual"
+        },
+        { "code": "M3-C02", "order": 3, "type": "CONTENT",
+          "title": "Partes de un procedimiento",
+          "body": [
+            "Objetivo", "Alcance", "Responsabilidades", "Pasos específicos", "EPP requerido", "Medidas de emergencia", "Registros"
+          ]
+        },
+        { "code": "M3-Q02", "order": 4, "type": "ASK",
+          "question": "¿Qué partes debe incluir un procedimiento de seguridad completo?",
+          "objective": "Identificar componentes",
+          "acceptable_answers": ["objetivo", "alcance", "responsabilidades", "pasos específicos", "epp requerido", "medidas de emergencia", "registros"],
+          "question_type": "listado"
+        },
+        { "code": "M3-C03", "order": 5, "type": "CONTENT",
+          "title": "Criterios para seleccionar EPP",
+          "body": [
+            "Evaluar tipo de riesgo y nivel de exposición",
+            "Compatibilidad, ajuste y comodidad",
+            "Cumplimiento normativo y certificaciones"
+          ]
+        },
+        { "code": "M3-Q03", "order": 6, "type": "ASK",
+          "question": "Menciona dos criterios para seleccionar EPP adecuadamente.",
+          "objective": "Dominar criterios de selección de EPP",
+          "acceptable_answers": ["tipo de riesgo", "nivel de exposición", "compatibilidad", "ajuste", "normativa", "certificaciones"],
+          "question_type": "aplicación"
+        }
+      ]
+    },
+    {
+      "code": "M4",
+      "order": 4,
+      "title": "Aplicación",
+      "steps": [
+        { "code": "M4-CASE01", "order": 1, "type": "CASE",
+          "title": "Trabajo en altura en fachada",
+          "description": "Instalación de ventanas en tercer piso con uso de arnés y línea de vida.",
+          "variables": ["altura > 2 m", "arnés", "línea de vida", "supervisión", "verificación de anclajes"]
+        },
+        { "code": "M4-Q01", "order": 2, "type": "ASK",
+          "question": "¿Qué EPP mínimo usarías y por qué?",
+          "objective": "Justificar selección de EPP",
+          "acceptable_answers": ["arnés con línea de vida", "casco", "guantes", "calzado antideslizante"],
+          "question_type": "aplicación"
+        }
+      ]
+    },
+    {
+      "code": "M5",
+      "order": 5,
+      "title": "Discusión",
+      "steps": [
+        { "code": "M5-TOP01", "order": 1, "type": "TOPICS",
+          "items": ["Protocolizar vs. improvisar", "Cultura de seguridad"]
+        },
+        { "code": "M5-Q01", "order": 2, "type": "ASK",
+          "question": "¿Qué ventajas tiene documentar procedimientos frente a improvisar?",
+          "objective": "Comparar enfoques",
+          "acceptable_answers": ["estandariza", "reduce errores", "trazabilidad", "cumplimiento"],
+          "question_type": "argumentativa"
+        }
+      ]
+    },
+    {
+      "code": "M6",
+      "order": 6,
+      "title": "Reflexión",
+      "steps": [
+        { "code": "M6-REF01", "order": 1, "type": "REFLECTION_AREAS",
+          "items": ["Hábitos personales de seguridad", "Compromisos inmediatos"]
+        },
+        { "code": "M6-Q01", "order": 2, "type": "ASK",
+          "question": "¿Qué cambio aplicarás esta semana para mejorar tu seguridad?",
+          "objective": "Plan de mejora personal",
+          "acceptable_answers": ["ejemplo personal", "compromiso concreto"],
+          "question_type": "reflexiva"
+        }
+      ]
+    }
+  ]
+}
+
+
