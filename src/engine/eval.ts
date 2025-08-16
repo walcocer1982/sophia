@@ -3,6 +3,8 @@ export function normalize(input: string): string {
 		.toLowerCase()
 		.normalize('NFD')
 		.replace(/\p{Diacritic}/gu, '')
+		// Colapsa repeticiones largas de caracteres: accidenteee -> accidentee
+		.replace(/([a-zñ])\1{2,}/g, '$1$1')
 		.replace(/[^\p{L}\p{N}\s]/gu, ' ')
 		.replace(/\s+/g, ' ')
 		.trim();
@@ -50,15 +52,33 @@ export function computeMatchedMissing(user: string, acceptable: string[] = [], e
 	const u = normalize(user);
 	const essentials = acceptable;
 	const matched: string[] = [];
+	const uTokens = u.split(' ').filter(Boolean);
 	for (const a of essentials) {
 		const n = normalize(a);
 		if (!n) continue;
+		// Coincidencia estricta por frase completa
 		if (u === n || u.includes(n) || n.includes(u)) { matched.push(a); continue; }
 		if (fuzzy) {
 			const dist = levenshtein(u, n);
 			const sim = jaccard(u, n);
-			if ((fuzzy.maxEditDistance && dist <= fuzzy.maxEditDistance) || (fuzzy.similarityMin && sim >= fuzzy.similarityMin)) matched.push(a);
+			if ((fuzzy.maxEditDistance && dist <= fuzzy.maxEditDistance) || (fuzzy.similarityMin && sim >= fuzzy.similarityMin)) { matched.push(a); continue; }
+			// Fuzzy a nivel de tokens: si algún token del usuario se parece a un token del aceptable
+			const nTokens = n.split(/\s+/).filter(t => t.length >= 4);
+			const tokenHit = uTokens.some(ut => nTokens.some(nt => {
+				if (!ut || !nt) return false;
+				if (ut === nt || ut.includes(nt) || nt.includes(ut)) return true;
+				const d = levenshtein(ut, nt);
+				return typeof fuzzy.maxEditDistance === 'number' ? d <= fuzzy.maxEditDistance : d <= 1;
+			}));
+			if (tokenHit) { matched.push(a); continue; }
+			// Soft token match conservador por inclusión directa
+			const tokens = n.split(/\s+/).filter(t => t.length >= 4);
+			if (tokens.some(t => u.includes(t))) { matched.push(a); }
+			continue;
 		}
+		// Sin fuzzy: aplicar soft token match mínimo
+		const tokens = n.split(/\s+/).filter(t => t.length >= 4);
+		if (tokens.some(t => u.includes(t))) { matched.push(a); continue; }
 	}
 	if (matched.length === 0 && expected?.length) {
 		const extras = expected.filter(e => {
@@ -70,6 +90,9 @@ export function computeMatchedMissing(user: string, acceptable: string[] = [], e
 				const sim = jaccard(u, n);
 				return (fuzzy.maxEditDistance && dist <= fuzzy.maxEditDistance) || (fuzzy.similarityMin && sim >= fuzzy.similarityMin);
 			}
+			// Soft token para expected
+			const tokens = n.split(/\s+/).filter(t => t.length >= 4);
+			if (tokens.some(t => u.includes(t))) return true;
 			return false;
 		}).slice(0, 2);
 		matched.push(...extras);

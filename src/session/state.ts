@@ -10,6 +10,7 @@ export type SessionState = {
 	lastAnswerByAskCode?: Record<string, string>;
 	noSeCountByAskCode?: Record<string, number>;
 	lastActionByAskCode?: Record<string, string>;
+	justAskedFollowUp?: boolean;
 	askedAskCodes: string[];
 	answeredAskCodes: string[];
 	done: boolean;
@@ -26,6 +27,7 @@ export function initSession(planUrl: string, plan: LessonPlan): SessionState {
 		lastAnswerByAskCode: {},
 		noSeCountByAskCode: {},
 		lastActionByAskCode: {},
+		justAskedFollowUp: false,
 		askedAskCodes: [],
 		answeredAskCodes: [],
 		done: false
