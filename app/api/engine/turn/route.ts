@@ -1,5 +1,5 @@
 import { runDocenteLLM } from '@/ai/orchestrator';
-import { classifyTurn, isVagueAnswer, type AskPolicy, evaluateHybrid } from '@/engine/eval';
+import { evaluateHybrid, type AskPolicy } from '@/engine/eval';
 import { decideNextAction } from '@/engine/flow/transition';
 import { extractKeywords } from '@/engine/hints';
 import { advanceTo, currentStep, decideAction, next } from '@/engine/runner';
@@ -247,7 +247,7 @@ export async function POST(req: Request) {
             acceptable,
             expected,
             policy,
-            { fuzzy: { maxEditDistance: 1, similarityMin: 0.35 }, semThresh: 0.78, semBestThresh: 0.72, maxHints: 2 },
+            { fuzzy: { maxEditDistance: 1, similarityMin: 0.35 }, semThresh: 0.78, semBestThresh: 0.65, maxHints: 2 },
             { lastAnswer: state.lastAnswerByAskCode?.[stepCode], hintsUsed }
           );
           const cls = { kind: hybrid.kind, matched: hybrid.matched, missing: hybrid.missing } as const;
@@ -263,8 +263,12 @@ export async function POST(req: Request) {
               const b = has(cls.missing) ? `Te falta incluir ${cls.missing.join(', ')}.` : '';
               return `Vas bien: ${a}. ${b}`.trim();
             }
-            if (has(cls.missing)) return `Aún no es claro. Intenta mencionar: ${cls.missing.join(', ')}.`;
-            return `Aún no es claro. Da un ejemplo o una idea concreta.`;
+            // Abridores configurables para variar el feedback (evita repetición)
+            const openers: string[] = (coursePolicies?.feedback?.openers?.hint || []) as string[];
+            const idx = Math.max(0, (attempts % Math.max(1, openers.length)) - 1);
+            const opener = openers[idx] || 'Intenta precisar un poco más.';
+            if (has(cls.missing)) return `${opener} Menciona: ${cls.missing.join(', ')}.`;
+            return `${opener} Da un ejemplo o una idea concreta.`;
           };
           if (!vague && cls.kind === 'ACCEPT') {
             let fb = '';

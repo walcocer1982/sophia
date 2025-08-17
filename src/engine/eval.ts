@@ -203,7 +203,7 @@ export async function evaluateHybrid(
   acceptable: string[] = [],
   expected: string[] = [],
   policy: AskPolicy = { type: 'conceptual' },
-  opts: HybridOpts = { fuzzy: { maxEditDistance: 1, similarityMin: 0.35 }, semThresh: 0.78, semBestThresh: 0.72, maxHints: 2 },
+  opts: HybridOpts = { fuzzy: { maxEditDistance: 1, similarityMin: 0.35 }, semThresh: 0.78, semBestThresh: 0.65, maxHints: 2 },
   context?: { lastAnswer?: string; hintsUsed?: number }
 ): Promise<{ kind: 'ACCEPT'|'PARTIAL'|'HINT'|'REFOCUS'; reason: string; matched: string[]; missing: string[]; sem?: { cos: number; best?: { text: string; cos: number } } }> {
   const u = normalize(user);
