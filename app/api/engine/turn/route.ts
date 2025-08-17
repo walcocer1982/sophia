@@ -299,8 +299,8 @@ export async function POST(req: Request) {
                 // Puente breve al siguiente foco (ej. conexión)
                 const recent = await getRecentHistory(sessionKey, 4);
                 const bridge = await runDocenteLLM({ language: 'es', action: 'advance', stepType: nxt.step.type, momentTitle: state.plan?.moments[nxt.step.momentIndex]?.title, objective: state.plan?.meta?.lesson_name || '', recentHistory: recent });
-                const llm2 = await runDocenteLLM({ language: 'es', action: 'explain', stepType: nxt.step.type, momentTitle: state.plan?.moments[nxt.step.momentIndex]?.title, objective: state.plan?.meta?.lesson_name || '', contentBody: bodyArr, recentHistory: recent });
-                nextMsg = [bridge.message, llm2.message || bodyArr.join(' — ')].filter(Boolean).join('\n\n');
+                // Evitar re‑narrar: no insertar historia aquí, sólo puente
+                nextMsg = bridge.message || '';
               } catch {
                 nextMsg = bodyArr.join(' — ');
               }
