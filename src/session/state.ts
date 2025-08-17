@@ -11,6 +11,9 @@ export type SessionState = {
 	noSeCountByAskCode?: Record<string, number>;
 	lastActionByAskCode?: Record<string, string>;
 	justAskedFollowUp?: boolean;
+	// Anti-repetición de narrativa por momento
+	narrativesShownByMoment?: Record<number, boolean>;
+	lastNarrativeHashByMoment?: Record<number, string>;
 	askedAskCodes: string[];
 	answeredAskCodes: string[];
 	done: boolean;
@@ -28,6 +31,8 @@ export function initSession(planUrl: string, plan: LessonPlan): SessionState {
 		noSeCountByAskCode: {},
 		lastActionByAskCode: {},
 		justAskedFollowUp: false,
+		narrativesShownByMoment: {},
+		lastNarrativeHashByMoment: {},
 		askedAskCodes: [],
 		answeredAskCodes: [],
 		done: false

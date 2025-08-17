@@ -149,6 +149,9 @@ export async function POST(req: Request) {
 				const parts = [data.title, ...(data.body || []), data.text, ...(data.items || [])].filter(Boolean) as string[];
 				const bodyArr: string[] = parts as string[];
 				try {
+					// Anti-repetición: emite narrativa sólo una vez por momento
+					const mIdx = act.step.momentIndex;
+					const already = Boolean(state.narrativesShownByMoment?.[mIdx]);
 					const recent = await getRecentHistory(sessionKey, 4);
 					const llm = await runDocenteLLM({
 						language: 'es',
@@ -159,7 +162,7 @@ export async function POST(req: Request) {
 						contentBody: bodyArr,
 						recentHistory: recent
 					});
-					message = llm.message;
+					message = already ? '' : llm.message;
 				} catch {
 					message = bodyArr.join(' — ') || 'Continuemos con el contenido.';
 				}
@@ -178,6 +181,8 @@ export async function POST(req: Request) {
 				}
 				// marcar flag para evitar eco y adelantar estado a la ASK
 				state.justAskedFollowUp = Boolean(followUp);
+				// marca narrativa mostrada
+				try { (state.narrativesShownByMoment ||= {})[act.step.momentIndex] = true; } catch {}
 				if (typeof targetIdx === 'number') { state = advanceTo(state, targetIdx); }
 				SESSIONS.set(sessionKey, state);
 				try { await getSessionStore().set(sessionKey, state); } catch {}
