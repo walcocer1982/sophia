@@ -64,7 +64,8 @@ export function computeMatchedMissing(user: string, acceptable: string[] = [], e
 			if ((fuzzy.maxEditDistance && dist <= fuzzy.maxEditDistance) || (fuzzy.similarityMin && sim >= fuzzy.similarityMin)) { matched.push(a); continue; }
 			// Fuzzy a nivel de tokens: si algún token del usuario se parece a un token del aceptable
 			const nTokens = n.split(/\s+/).filter(t => t.length >= 4);
-			const tokenHit = uTokens.some(ut => nTokens.some(nt => {
+			const uStrong = uTokens.filter(t => t.length >= 4);
+			const tokenHit = uStrong.some(ut => nTokens.some(nt => {
 				if (!ut || !nt) return false;
 				if (ut === nt || ut.includes(nt) || nt.includes(ut)) return true;
 				const d = levenshtein(ut, nt);
@@ -121,6 +122,10 @@ export function classifyTurn(
 ): { kind: 'ACCEPT'|'PARTIAL'|'HINT'|'REFOCUS'; matched: string[]; missing: string[]; reason: string } {
 	const u = normalize(user);
 	if (!u) {
+		return { kind: 'HINT', matched: [], missing: acceptable.slice(0, 3), reason: 'DONT_KNOW' };
+	}
+	// Gate duro: si el alumno dice "no sé" o equivalente, no intentamos ACCEPT/PARTIAL
+	if (isNoSe(user)) {
 		return { kind: 'HINT', matched: [], missing: acceptable.slice(0, 3), reason: 'DONT_KNOW' };
 	}
 	const { matched, missing } = computeMatchedMissing(u, acceptable, expected, fuzzy);
