@@ -1,7 +1,7 @@
-import OpenAI from 'openai';
-import { buildSystemPrompt, buildUserPrompt, DocentePromptContext } from './prompt';
+import { getClient, pickModel } from '@/lib/ai';
+import { DocentePromptContext, buildSystemPrompt, buildUserPrompt } from './prompt';
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const client = getClient();
 
 function stripQuestions(text?: string): string {
   const raw = (text || '').trim();
@@ -44,8 +44,9 @@ function stripRepeatedFromHistory(text: string, ctx: DocentePromptContext): stri
 export async function runDocenteLLM(ctx: DocentePromptContext): Promise<{ message: string; followUp?: string }> {
   const system = buildSystemPrompt(ctx);
   const user = buildUserPrompt(ctx);
+  const model = pickModel('cheap'); // Usar modelo barato para redacción docente
   const r = await client.responses.create({
-    model: 'gpt-4o-mini',
+    model,
     input: [
       { role: 'system', content: system },
       { role: 'user', content: user },

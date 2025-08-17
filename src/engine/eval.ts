@@ -180,15 +180,16 @@ export function isNoSe(answer?: string): boolean {
 	const patterns = [
 		/^no\s*se$/, /^no\s*lo\s*se$/, /^no\s*sé$/, /^no\s*lo\s*sé$/,
 		/^ns$/, /^n\/a$/, /^no\s*sab[oó]$/, /^no\s*est[oó]\s*seguro$/,
-		/^no$/,
+		/^no$/, /^mmm$/, /^mm$/,
 		/^[\.\!\?…]+$/
 	];
 	if (patterns.some(rx => rx.test(a))) return true;
 	const words = a.split(/\s+/).filter(Boolean);
-	return words.length <= 2;
+	return words.length <= 1; // MÁS PERMISIVO: solo 1 palabra
 }
 
 // Evaluación híbrida (vaguedad → rápido → semántico)
+import { escalateReasoning } from '@/engine/eval-escalation';
 import { buildAskIndex, semanticScore, type AskVectorIndex } from '@/engine/semvec';
 
 export type HybridOpts = {
@@ -206,13 +207,38 @@ export async function evaluateHybrid(
   opts: HybridOpts = { fuzzy: { maxEditDistance: 1, similarityMin: 0.35 }, semThresh: 0.78, semBestThresh: 0.65, maxHints: 2 },
   context?: { lastAnswer?: string; hintsUsed?: number }
 ): Promise<{ kind: 'ACCEPT'|'PARTIAL'|'HINT'|'REFOCUS'; reason: string; matched: string[]; missing: string[]; sem?: { cos: number; best?: { text: string; cos: number } } }> {
+  // Umbrales de embeddings por tipo de pregunta (MUY PERMISIVOS)
+  const getThresholdsByType = (type: string) => {
+    switch (type) {
+      case 'diagnóstica':
+        return { semThresh: 0.45, semBestThresh: 0.35 };
+      case 'conceptual':
+        return { semThresh: 0.50, semBestThresh: 0.40 };
+      case 'aplicación':
+        return { semThresh: 0.48, semBestThresh: 0.38 };
+      case 'listado':
+        return { semThresh: 0.46, semBestThresh: 0.36 };
+      default:
+        return { semThresh: opts.semThresh ?? 0.52, semBestThresh: opts.semBestThresh ?? 0.42 };
+    }
+  };
+  
+  const thresholds = getThresholdsByType(policy.type);
+  const semThresh = thresholds.semThresh;
+  const semBestThresh = thresholds.semBestThresh;
   const u = normalize(user);
   if (!u) return { kind: 'HINT', reason: 'EMPTY', matched: [], missing: acceptable.slice(0,3) };
   if (isNoSe(user)) return { kind: 'HINT', reason: 'DONT_KNOW', matched: [], missing: acceptable.slice(0,3) };
 
-  // 1) Gate de vaguedad (barato)
-  const vague = isVagueAnswer(u, undefined, { minUsefulTokens: 3, echoOverlap: 0.7, lastAnswer: context?.lastAnswer });
+  // 1) Gate de vaguedad (barato) - MÁS PERMISIVO
+  const vague = isVagueAnswer(u, undefined, { minUsefulTokens: 2, echoOverlap: 0.8, lastAnswer: context?.lastAnswer });
   if (vague) return { kind: 'HINT', reason: 'VAGUE', matched: [], missing: acceptable.slice(0,3) };
+  
+  // 2) Detección de "eco" (repetición de pregunta/respuesta anterior) - MÁS PERMISIVO
+  if (context?.lastAnswer) {
+    const overlap = jaccard(u, normalize(context.lastAnswer));
+    if (overlap >= 0.8) return { kind: 'HINT', reason: 'ECHO', matched: [], missing: acceptable.slice(0,3) };
+  }
 
   // 2) Match rápido (barato)
   const fast = classifyTurn(u, policy, acceptable, expected, opts.fuzzy);
@@ -223,8 +249,18 @@ export async function evaluateHybrid(
   try { idx = await buildAskIndex(acceptable, expected); } catch { idx = null; }
   if (!idx || !idx.centroid?.length) return { kind: 'HINT', reason: 'NO_SEM_MODEL', matched: [], missing: acceptable.slice(0,3) };
   const { cos, best } = await semanticScore(u, idx);
-  const semThresh = opts.semThresh ?? 0.78;
-  const semBestThresh = opts.semBestThresh ?? 0.72;
+  
+  // Debug: embeddings activos
+  if (process.env.ENGINE_DEBUG === 'true') {
+    console.log('[EMBEDDINGS]', { 
+      user: u.slice(0, 50), 
+      cos, 
+      best: best?.text?.slice(0, 30), 
+      semThresh: opts.semThresh,
+      semBestThresh: opts.semBestThresh 
+    });
+  }
+  // Usar umbrales calculados por tipo de pregunta
   if (cos >= semThresh) {
     if (policy.type === 'aplicacion') {
       const justifica = /porque|para|ya que/i.test(user);
@@ -238,5 +274,30 @@ export async function evaluateHybrid(
   if ((context?.hintsUsed || 0) >= (opts.maxHints ?? 2)) {
     return { kind: 'REFOCUS', reason: 'MAX_HINTS', matched: [], missing: acceptable.slice(0,3), sem: { cos, best } };
   }
+  
+  // Escalamiento a thinker para casos borderline/ambiguos
+  if (cos >= 0.4 && cos < semThresh && (best?.cos || 0) >= 0.35) {
+    try {
+      const escalation = await escalateReasoning({
+        student: user,
+        objective: policy.type,
+        acceptable,
+        expected,
+        matched: best?.text ? [best.text] : [],
+        missing: acceptable.filter(a => a !== best?.text).slice(0,2),
+        hintsUsed: context?.hintsUsed || 0
+      });
+      
+      if (escalation.decision === 'ACCEPT') {
+        return { kind: 'ACCEPT', reason: 'THINKER_ESCALATION', matched: best?.text ? [best.text] : [], missing: [], sem: { cos, best } };
+      } else if (escalation.decision === 'HINT') {
+        return { kind: 'HINT', reason: 'THINKER_ESCALATION', matched: [], missing: acceptable.slice(0,3), sem: { cos, best } };
+      }
+    } catch (error) {
+      // Si falla el escalamiento, continuar con la lógica normal
+      console.warn('[ESCALATION_ERROR]', error);
+    }
+  }
+  
   return { kind: 'HINT', reason: 'SEM_LOW', matched: [], missing: acceptable.slice(0,3), sem: { cos, best } };
 }

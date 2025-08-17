@@ -1,7 +1,7 @@
-import OpenAI from 'openai';
+import { getClient, pickModel } from '@/lib/ai';
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const MODEL = process.env.EMBED_MODEL || 'text-embedding-3-small';
+const client = getClient();
+const MODEL = pickModel('embed');
 
 export type AskVectorIndex = {
 	acceptables: string[];
