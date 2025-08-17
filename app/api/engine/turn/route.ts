@@ -186,9 +186,16 @@ export async function POST(req: Request) {
         if (act.kind === 'ask') {
 				const q = act.step.data.question || '';
 				const acceptable = act.step.data.acceptable_answers || [];
-				// Política básica por question_type
+				// Política por tipo con K dinámico para LISTADO
 				const qtype = String(act.step.data.question_type || '').toLowerCase();
-				const policy: AskPolicy = qtype.includes('lista') ? { type: 'listado', thresholdK: 2 }
+				// Identificador del paso para contar intentos/acciones previas
+				const stepCodeDyn = act.step.code || `Q:${q.substring(0,50)}`;
+				const attemptsSoFar = Number(state.attemptsByAskCode?.[stepCodeDyn] || 0);
+				const lastActionForStep = String(state.lastActionByAskCode?.[stepCodeDyn] || 'ask');
+				const firstAttempt = attemptsSoFar === 0;
+				const afterHint = lastActionForStep === 'hint';
+				const dynamicK = qtype.includes('lista') ? (firstAttempt ? 1 : (afterHint ? 2 : 2)) : undefined;
+				const policy: AskPolicy = qtype.includes('lista') ? { type: 'listado', thresholdK: dynamicK }
 					: qtype.includes('aplica') ? { type: 'aplicacion', requiresJustification: true }
 					: (qtype.includes('abierta') ? { type: 'metacognitiva' } : { type: (qtype as any) || 'conceptual' });
 				// Derivar expected desde pasos previos (CONTENT/KEY_*) del mismo momento
