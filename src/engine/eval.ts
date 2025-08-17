@@ -187,3 +187,56 @@ export function isNoSe(answer?: string): boolean {
 	const words = a.split(/\s+/).filter(Boolean);
 	return words.length <= 2;
 }
+
+// Evaluación híbrida (vaguedad → rápido → semántico)
+import { buildAskIndex, semanticScore, type AskVectorIndex } from '@/engine/semvec';
+
+export type HybridOpts = {
+  fuzzy?: { maxEditDistance?: number; similarityMin?: number };
+  semThresh?: number;
+  semBestThresh?: number;
+  maxHints?: number;
+};
+
+export async function evaluateHybrid(
+  user: string,
+  acceptable: string[] = [],
+  expected: string[] = [],
+  policy: AskPolicy = { type: 'conceptual' },
+  opts: HybridOpts = { fuzzy: { maxEditDistance: 1, similarityMin: 0.35 }, semThresh: 0.78, semBestThresh: 0.72, maxHints: 2 },
+  context?: { lastAnswer?: string; hintsUsed?: number }
+): Promise<{ kind: 'ACCEPT'|'PARTIAL'|'HINT'|'REFOCUS'; reason: string; matched: string[]; missing: string[]; sem?: { cos: number; best?: { text: string; cos: number } } }> {
+  const u = normalize(user);
+  if (!u) return { kind: 'HINT', reason: 'EMPTY', matched: [], missing: acceptable.slice(0,3) };
+  if (isNoSe(user)) return { kind: 'HINT', reason: 'DONT_KNOW', matched: [], missing: acceptable.slice(0,3) };
+
+  // 1) Gate de vaguedad (barato)
+  const vague = isVagueAnswer(u, undefined, { minUsefulTokens: 3, echoOverlap: 0.7, lastAnswer: context?.lastAnswer });
+  if (vague) return { kind: 'HINT', reason: 'VAGUE', matched: [], missing: acceptable.slice(0,3) };
+
+  // 2) Match rápido (barato)
+  const fast = classifyTurn(u, policy, acceptable, expected, opts.fuzzy);
+  if (fast.kind === 'ACCEPT' || fast.kind === 'PARTIAL') return { ...fast, reason: fast.reason, sem: undefined } as any;
+
+  // 3) Semántico (costoso): embeddings
+  let idx: AskVectorIndex | null = null;
+  try { idx = await buildAskIndex(acceptable, expected); } catch { idx = null; }
+  if (!idx || !idx.centroid?.length) return { kind: 'HINT', reason: 'NO_SEM_MODEL', matched: [], missing: acceptable.slice(0,3) };
+  const { cos, best } = await semanticScore(u, idx);
+  const semThresh = opts.semThresh ?? 0.78;
+  const semBestThresh = opts.semBestThresh ?? 0.72;
+  if (cos >= semThresh) {
+    if (policy.type === 'aplicacion') {
+      const justifica = /porque|para|ya que/i.test(user);
+      return { kind: (justifica ? 'ACCEPT' : 'PARTIAL'), reason: (justifica ? 'SEM_APLICACION_OK' : 'SEM_FALTA_JUSTIFICACION'), matched: best?.text ? [best.text] : [], missing: [], sem: { cos, best } } as any;
+    }
+    return { kind: 'PARTIAL', reason: 'SEM_SIMILAR', matched: best?.text ? [best.text] : [], missing: acceptable.filter(a => a !== best?.text).slice(0,2), sem: { cos, best } };
+  }
+  if ((best?.cos || 0) >= semBestThresh) {
+    return { kind: 'PARTIAL', reason: 'SEM_BEST', matched: best?.text ? [best.text] : [], missing: acceptable.filter(a => a !== best?.text).slice(0,2), sem: { cos, best } };
+  }
+  if ((context?.hintsUsed || 0) >= (opts.maxHints ?? 2)) {
+    return { kind: 'REFOCUS', reason: 'MAX_HINTS', matched: [], missing: acceptable.slice(0,3), sem: { cos, best } };
+  }
+  return { kind: 'HINT', reason: 'SEM_LOW', matched: [], missing: acceptable.slice(0,3), sem: { cos, best } };
+}

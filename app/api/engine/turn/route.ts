@@ -1,5 +1,5 @@
 import { runDocenteLLM } from '@/ai/orchestrator';
-import { classifyTurn, type AskPolicy, isVagueAnswer, isNoSe } from '@/engine/eval';
+import { classifyTurn, isVagueAnswer, type AskPolicy, evaluateHybrid } from '@/engine/eval';
 import { decideNextAction } from '@/engine/flow/transition';
 import { extractKeywords } from '@/engine/hints';
 import { advanceTo, currentStep, decideAction, next } from '@/engine/runner';
@@ -240,10 +240,18 @@ export async function POST(req: Request) {
             } catch { message = q; }
             break;
           }
-          // Evaluar respuesta del usuario (fuzzy más permisivo para LN)
-          const cls = classifyTurn(pendingInput, policy, acceptable, expected, { maxEditDistance: 1, similarityMin: 0.35 });
-          // Vague/eco: penalizar repeticiones de la consigna
-          const vague = isVagueAnswer(pendingInput, q, { minUsefulTokens: 3, echoOverlap: 0.5 });
+          // Evaluación híbrida: vaguedad → rápido → semántica (embeddings bajo demanda)
+          const hintsUsed = Number(state.hintsByAskCode?.[stepCode] || 0);
+          const hybrid = await evaluateHybrid(
+            pendingInput,
+            acceptable,
+            expected,
+            policy,
+            { fuzzy: { maxEditDistance: 1, similarityMin: 0.35 }, semThresh: 0.78, semBestThresh: 0.72, maxHints: 2 },
+            { lastAnswer: state.lastAnswerByAskCode?.[stepCode], hintsUsed }
+          );
+          const cls = { kind: hybrid.kind, matched: hybrid.matched, missing: hybrid.missing } as const;
+          const vague = hybrid.reason === 'VAGUE';
                 // En metacognitiva (Saludo) NO aceptar respuestas DONT_KNOW/VAGUE ni por longitud.
                 // La aceptación debe basarse en señales reales del objetivo/expected o acceptable.
           // Feedback determinista breve basado en matched/missing
@@ -332,7 +340,7 @@ export async function POST(req: Request) {
           }
           const attempts = state.attemptsByAskCode[stepCode] || 0;
           const vagueCfg = coursePolicies?.vague || {};
-          if (vague || cls.kind === 'PARTIAL' || cls.kind === 'HINT' || isNo) {
+          if (vague || cls.kind === 'PARTIAL' || cls.kind === 'HINT' || isNo || hybrid.reason === 'MAX_HINTS' || hybrid.reason === 'SEM_LOW') {
             // Mensaje alentador
             let fb = '';
             try {
@@ -474,7 +482,9 @@ export async function POST(req: Request) {
 					messageChars: (message || '').length,
 					followUpChars: (followUp || '').length,
 					hasFollowUp: Boolean(followUp && String(followUp).trim()),
-					userInputLen: (pendingInput || '').length
+					userInputLen: (pendingInput || '').length,
+					thresholds: { jaccardMin: 0.35, semThresh: 0.78, semBest: 0.72 },
+					hintsUsed: Number(state.hintsByAskCode?.[(st as any)?.code || dbg?.stepCode] || 0)
 				};
 				// eslint-disable-next-line no-console
 				console.debug(JSON.stringify(payload));
