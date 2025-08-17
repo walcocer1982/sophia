@@ -1,8 +1,7 @@
 import { runDocenteLLM } from '@/ai/orchestrator';
-import { classifyTurn, type AskPolicy } from '@/engine/eval';
-import { decideNextAction } from '@/engine/flow/transition';
+import { evaluateHybrid, type AskPolicy } from '@/engine/eval';
 import { extractKeywords } from '@/engine/hints';
-import { advanceTo, currentStep, decideAction, next } from '@/engine/runner';
+import { advanceTo, currentStep, decideAction, getNextAskInSameCycle, next } from '@/engine/runner';
 import { loadAndCompile } from '@/plan/compilePlan';
 import { appendHistory, clearHistory, getRecentHistory } from '@/session/history';
 import { SessionState, initSession } from '@/session/state';
@@ -109,7 +108,7 @@ export async function POST(req: Request) {
       if (typeof (clientState as any).justAskedFollowUp === 'boolean') {
         state.justAskedFollowUp = Boolean((clientState as any).justAskedFollowUp);
       }
-    }
+		}
     const coursePolicies = await loadCoursePolicies(deriveCourseId(state.planUrl));
 		const step = currentStep(state);
 		// Debug inicio de turno
@@ -149,6 +148,9 @@ export async function POST(req: Request) {
 				const parts = [data.title, ...(data.body || []), data.text, ...(data.items || [])].filter(Boolean) as string[];
 				const bodyArr: string[] = parts as string[];
 				try {
+					// Anti-repetición: emite narrativa sólo una vez por momento
+					const mIdx = act.step.momentIndex;
+					const already = Boolean(state.narrativesShownByMoment?.[mIdx]);
 					const recent = await getRecentHistory(sessionKey, 4);
 					const llm = await runDocenteLLM({
 						language: 'es',
@@ -159,7 +161,7 @@ export async function POST(req: Request) {
 						contentBody: bodyArr,
 						recentHistory: recent
 					});
-					message = llm.message;
+					message = already ? '' : llm.message;
 				} catch {
 					message = bodyArr.join(' — ') || 'Continuemos con el contenido.';
 				}
@@ -178,6 +180,8 @@ export async function POST(req: Request) {
 				}
 				// marcar flag para evitar eco y adelantar estado a la ASK
 				state.justAskedFollowUp = Boolean(followUp);
+				// marca narrativa mostrada
+				try { (state.narrativesShownByMoment ||= {})[act.step.momentIndex] = true; } catch {}
 				if (typeof targetIdx === 'number') { state = advanceTo(state, targetIdx); }
 				SESSIONS.set(sessionKey, state);
 				try { await getSessionStore().set(sessionKey, state); } catch {}
@@ -186,9 +190,16 @@ export async function POST(req: Request) {
         if (act.kind === 'ask') {
 				const q = act.step.data.question || '';
 				const acceptable = act.step.data.acceptable_answers || [];
-				// Política básica por question_type
+				// Política por tipo con K dinámico para LISTADO
 				const qtype = String(act.step.data.question_type || '').toLowerCase();
-				const policy: AskPolicy = qtype.includes('lista') ? { type: 'listado', thresholdK: 2 }
+				// Identificador del paso para contar intentos/acciones previas
+				const stepCodeDyn = act.step.code || `Q:${q.substring(0,50)}`;
+				const attemptsSoFar = Number(state.attemptsByAskCode?.[stepCodeDyn] || 0);
+				const lastActionForStep = String(state.lastActionByAskCode?.[stepCodeDyn] || 'ask');
+				const firstAttempt = attemptsSoFar === 0;
+				const afterHint = lastActionForStep === 'hint';
+				const dynamicK = qtype.includes('lista') ? (firstAttempt ? 1 : (afterHint ? 2 : 2)) : undefined;
+				const policy: AskPolicy = qtype.includes('lista') ? { type: 'listado', thresholdK: dynamicK }
 					: qtype.includes('aplica') ? { type: 'aplicacion', requiresJustification: true }
 					: (qtype.includes('abierta') ? { type: 'metacognitiva' } : { type: (qtype as any) || 'conceptual' });
 				// Derivar expected desde pasos previos (CONTENT/KEY_*) del mismo momento
@@ -212,7 +223,7 @@ export async function POST(req: Request) {
 					expected = extractKeywords(texts);
 				} catch {}
           const momentKind = mapMomentKind(state.plan?.moments?.[act.step.momentIndex]?.title);
-          const maxAttempts = Number(coursePolicies?.advance?.maxAttemptsBeforeForce ?? 999);
+          const maxAttempts = Number(coursePolicies?.advance?.maxAttemptsBeforeForce ?? 2);
           const allowForcedOn: string[] = Array.isArray(coursePolicies?.advance?.allowForcedOn) ? coursePolicies.advance.allowForcedOn : ['SALUDO','CONEXION'];
           const stepCode = act.step.code || `Q:${q.substring(0,50)}`;
           if (!pendingInput.trim()) {
@@ -229,12 +240,22 @@ export async function POST(req: Request) {
             try {
               const recent = await getRecentHistory(sessionKey, 4);
               const llm = await runDocenteLLM({ language: 'es', action: 'ask', stepType: 'ASK', questionText: q, objective: String(act.step.data.objective || ''), recentHistory: recent });
-              message = llm.message;
-            } catch { message = q; }
-            break;
-          }
-          // Evaluar respuesta del usuario
-          const cls = classifyTurn(pendingInput, policy, acceptable, expected, { maxEditDistance: 1, similarityMin: 0.6 });
+						message = llm.message;
+					} catch { message = q; }
+					break;
+				}
+          // Evaluación híbrida: vaguedad → rápido → semántica (embeddings bajo demanda)
+          const hintsUsed = Number(state.hintsByAskCode?.[stepCode] || 0);
+          const hybrid = await evaluateHybrid(
+            pendingInput,
+            acceptable,
+            expected,
+            policy,
+            { fuzzy: { maxEditDistance: 1, similarityMin: 0.25 }, semThresh: 0.52, semBestThresh: 0.42, maxHints: 2 },
+            { lastAnswer: state.lastAnswerByAskCode?.[stepCode], hintsUsed }
+          );
+          const cls = { kind: hybrid.kind, matched: hybrid.matched, missing: hybrid.missing } as const;
+          const vague = hybrid.reason === 'VAGUE';
                 // En metacognitiva (Saludo) NO aceptar respuestas DONT_KNOW/VAGUE ni por longitud.
                 // La aceptación debe basarse en señales reales del objetivo/expected o acceptable.
           // Feedback determinista breve basado en matched/missing
@@ -246,10 +267,14 @@ export async function POST(req: Request) {
               const b = has(cls.missing) ? `Te falta incluir ${cls.missing.join(', ')}.` : '';
               return `Vas bien: ${a}. ${b}`.trim();
             }
-            if (has(cls.missing)) return `Aún no es claro. Intenta mencionar: ${cls.missing.join(', ')}.`;
-            return `Aún no es claro. Da un ejemplo o una idea concreta.`;
+            // Abridores configurables para variar el feedback (evita repetición)
+            const openers: string[] = (coursePolicies?.feedback?.openers?.hint || []) as string[];
+            const idx = Math.max(0, (attempts % Math.max(1, openers.length)) - 1);
+            const opener = openers[idx] || 'Intenta precisar un poco más.';
+            if (has(cls.missing)) return `${opener} Menciona: ${cls.missing.join(', ')}.`;
+            return `${opener} Da un ejemplo o una idea concreta.`;
           };
-          if (cls.kind === 'ACCEPT') {
+          if (!vague && cls.kind === 'ACCEPT') {
             let fb = '';
             try {
               const fbCfg: any = (coursePolicies as any)?.feedback || {};
@@ -258,64 +283,106 @@ export async function POST(req: Request) {
               const llm = await runDocenteLLM({ language: 'es', action: 'feedback', stepType: 'ASK', questionText: q, userAnswer: pendingInput, matched: cls.matched, missing: cls.missing, objective: String(act.step.data.objective || ''), contentBody: expected, hintWordLimit: Number(fbCfg.maxSentences ?? 3), allowQuestions: fbCfg.allowQuestions !== false, kind: 'ACCEPT' as any, recentHistory: recent });
               fb = [deterministic, llm.message || ''].filter(Boolean).join('\n\n');
             } catch {}
-            // Avanzar al siguiente paso y componer salida (evaluación + siguiente acción)
+            // Avanzar al siguiente paso en orden secuencial (no saltar ASKs)
             state = next(state);
             SESSIONS.set(sessionKey, state);
             try { await getSessionStore().set(sessionKey, state); } catch {}
+            
+            // Componer salida según el tipo de paso siguiente
             let nextMsg = '';
-            const nxt = decideAction(currentStep(state));
-            if (nxt.kind === 'ask' && nxt.step) {
-              // Preparar la siguiente pregunta como followUp (se muestra en burbuja aparte)
-              const qNext = (nxt.step as any).data?.question || '';
-              followUp = qNext;
-              // no avanzamos más el estado aquí; ya estamos en la ASK correcta
-              dbg = { ...(dbg || {}), messageType: 'ask', nextAction: 'ask' };
-            } else if (nxt.kind === 'explain' && nxt.step) {
-              const d: any = nxt.step.data || {};
-              const parts = [d.title, ...(d.body || []), d.text, ...(d.items || [])].filter(Boolean) as string[];
-              const bodyArr: string[] = parts as string[];
-              try {
-                // Puente breve al siguiente foco (ej. conexión)
-                const recent = await getRecentHistory(sessionKey, 4);
-                const bridge = await runDocenteLLM({ language: 'es', action: 'advance', stepType: nxt.step.type, momentTitle: state.plan?.moments[nxt.step.momentIndex]?.title, objective: state.plan?.meta?.lesson_name || '', recentHistory: recent });
-                const llm2 = await runDocenteLLM({ language: 'es', action: 'explain', stepType: nxt.step.type, momentTitle: state.plan?.moments[nxt.step.momentIndex]?.title, objective: state.plan?.meta?.lesson_name || '', contentBody: bodyArr, recentHistory: recent });
-                nextMsg = [bridge.message, llm2.message || bodyArr.join(' — ')].filter(Boolean).join('\n\n');
-              } catch {
-                nextMsg = bodyArr.join(' — ');
-              }
-              // No mezclar: prepara sólo followUp y ADELANTA estado a la siguiente ASK
-              {
-                const stepsAfter = state.plan?.allSteps || [];
-                let targetIdx: number | undefined;
-                for (let i = state.stepIdx + 1; i < stepsAfter.length; i++) {
-                  const s = stepsAfter[i];
-                  const t = s.type;
-                  if (t === 'KEY_CONTENT' || t === 'KEY_POINTS' || t === 'EXPECTED_LEARNING') continue;
-                  if (t === 'ASK') { followUp = s.data.question || ''; targetIdx = i; break; }
-                }
-                state.justAskedFollowUp = Boolean(followUp);
-                if (typeof targetIdx === 'number') {
-                  state = advanceTo(state, targetIdx);
-                }
-                SESSIONS.set(sessionKey, state);
-                try { await getSessionStore().set(sessionKey, state); } catch {}
-              }
-            } else if (nxt.kind === 'end') {
-              try {
-                const recent = await getRecentHistory(sessionKey, 4);
-                const adv = await runDocenteLLM({ language: 'es', action: 'advance', stepType: 'END', objective: String(state.plan?.meta?.lesson_name || ''), recentHistory: recent });
-                nextMsg = adv.message || '';
-              } catch { nextMsg = ''; }
+            const nextStep = currentStep(state);
+            
+            // Debug: verificar qué paso es el siguiente
+            if (process.env.ENGINE_DEBUG === 'true') {
+              console.log('[AVANCE_ACCEPT]', { 
+                nextStepType: nextStep?.type, 
+                nextStepCode: nextStep?.code,
+                nextStepText: nextStep?.data?.text?.slice(0, 50),
+                momentIndex: nextStep?.momentIndex,
+                stepIndex: nextStep?.stepIndex
+              });
             }
+            
+            if (nextStep?.type === 'NARRATION' || nextStep?.type === 'CONTENT') {
+              // Blindaje anti-repetición: verificar si ya se mostró este contenido
+              const shownMap = state.shownByStepIndex || (state.shownByStepIndex = {});
+              const stepKey = `${nextStep.momentIndex}-${nextStep.stepIndex}`;
+              
+              if (!(shownMap as any)[stepKey]) {
+                // Si NO se ha mostrado, ejecutarlo y marcar como mostrado
+                try {
+                  const recent = await getRecentHistory(sessionKey, 4);
+                  const explain = await runDocenteLLM({ 
+                    language: 'es', 
+                    action: 'explain', 
+                    stepType: nextStep.type, 
+                    narrationText: nextStep.data?.text || '',
+                    contentBody: nextStep.data?.body || [],
+                    caseText: (nextStep.data as any)?.case || '',
+                    objective: String(nextStep.data?.objective || state.plan?.meta?.lesson_name || ''),
+                    recentHistory: recent 
+                  });
+                  nextMsg = explain.message || '';
+                  // Marcar como mostrado
+                  (shownMap as any)[stepKey] = true;
+                  
+                  // Debug: confirmar que se ejecutó la narrativa
+                  if (process.env.ENGINE_DEBUG === 'true') {
+                    console.log('[NARRATIVA_EJECUTADA]', { 
+                      stepKey, 
+                      nextMsgLength: nextMsg.length,
+                      nextMsgPreview: nextMsg.slice(0, 100)
+                    });
+                  }
+                } catch (error) { 
+                  nextMsg = '';
+                  if (process.env.ENGINE_DEBUG === 'true') {
+                    console.log('[NARRATIVA_ERROR]', { stepKey, error: String(error) });
+                  }
+                }
+              } else {
+                // Debug: confirmar que ya se mostró
+                if (process.env.ENGINE_DEBUG === 'true') {
+                  console.log('[NARRATIVA_YA_MOSTRADA]', { stepKey });
+                }
+              }
+              // Avanzar al siguiente paso después de la narrativa (se haya mostrado o no)
+              state = next(state);
+              SESSIONS.set(sessionKey, state);
+              try { await getSessionStore().set(sessionKey, state); } catch {}
+            }
+            
+            // Si hay una pregunta siguiente, ponerla como followUp
+            const nextAskStep = currentStep(state);
+            if (nextAskStep?.type === 'ASK') {
+              followUp = nextAskStep.data?.question || '';
+              state.justAskedFollowUp = Boolean(followUp);
+              dbg = { ...(dbg || {}), messageType: 'ask', nextAction: 'ask' };
+            }
+            
+            SESSIONS.set(sessionKey, state);
+            try { await getSessionStore().set(sessionKey, state); } catch {}
             message = [fb, nextMsg].filter(Boolean).join('\n\n');
+            
+            // Debug: verificar la composición final del mensaje
+            if (process.env.ENGINE_DEBUG === 'true') {
+              console.log('[MENSAJE_FINAL]', { 
+                fbLength: fb.length,
+                nextMsgLength: nextMsg.length,
+                messageLength: message.length,
+                messagePreview: message.slice(0, 200),
+                hasNarrativa: nextMsg.length > 0
+              });
+            }
             dbg = { ...(dbg || {}), kind: 'ACCEPT', feedbackKind: 'ACCEPT', matched: cls.matched?.slice(0,3) || [], missing: cls.missing?.slice(0,3) || [], stepCode };
-            pendingInput = '';
+					pendingInput = '';
             break;
-          }
+				}
           // Contabilizar respuesta previa y contadores separados para 'no sé'
           state.lastAnswerByAskCode![stepCode] = pendingInput;
           const noSeMap = state.noSeCountByAskCode || (state.noSeCountByAskCode = {});
-          const isNo = false; // detección por prompt
+          // Detección real de "no sé" / evasivas - MÁS PERMISIVO
+          const isNo = /^\s*(no\s*se|no\s*lo\s*se|no\s*sé|no\s*lo\s*sé|ns|n\/a|no|mmm|mm|ok|si|no\s*est[oó]\s*seguro)\s*$/i.test(pendingInput);
           if (isNo) {
             noSeMap[stepCode] = (noSeMap[stepCode] || 0) + 1;
           } else {
@@ -323,56 +390,78 @@ export async function POST(req: Request) {
           }
           const attempts = state.attemptsByAskCode[stepCode] || 0;
           const vagueCfg = coursePolicies?.vague || {};
-          if (cls.kind === 'PARTIAL' || cls.kind === 'HINT' || isNo) {
-            // Mensaje alentador
-            let fb = '';
-            try {
-              const fbCfg: any = (coursePolicies as any)?.feedback || {};
-              const recent = await getRecentHistory(sessionKey, 4);
-              const deterministic = buildDeterministicFeedback();
-              const llmFb = await runDocenteLLM({ language: 'es', action: 'feedback', stepType: 'ASK', questionText: q, userAnswer: pendingInput, matched: cls.matched, missing: cls.missing, objective: String(act.step.data.objective || ''), contentBody: expected, hintWordLimit: Number(fbCfg.maxSentences ?? 3), allowQuestions: fbCfg.allowQuestions !== false, kind: cls.kind as any, recentHistory: recent });
-              fb = [deterministic, llmFb.message || ''].filter(Boolean).join('\n\n');
-            } catch {}
-            const pool = (cls.missing && cls.missing.length ? cls.missing : expected).filter(Boolean).map(String);
-            // Decidir acción de apoyo
+          if (vague || cls.kind === 'PARTIAL' || cls.kind === 'HINT' || isNo || hybrid.reason === 'MAX_HINTS' || hybrid.reason === 'SEM_LOW') {
+            // Política de reintentos por pregunta (loop control)
             const lastActionMap = state.lastActionByAskCode || (state.lastActionByAskCode = {});
+            const hintsMap = state.hintsByAskCode || (state.hintsByAskCode = {} as any);
+            const attempts = state.attemptsByAskCode[stepCode] || 0;
+            const currentHints = hintsMap[stepCode] || 0;
             const lastAction = (lastActionMap[stepCode] as any) || 'ask';
-            const { nextAction } = decideNextAction({ lastAction, classKind: cls.kind as any, attempts, noSeCount: noSeMap[stepCode] || 0, cfg: coursePolicies?.advance });
-            lastActionMap[stepCode] = nextAction;
-            if (nextAction === 'hint') {
+            
+            // Actualizar contadores
+            if (cls.kind === 'HINT' || vague || isNo) {
+              if (lastAction === 'hint') hintsMap[stepCode] = currentHints + 1;
+              lastActionMap[stepCode] = 'hint';
+            }
+            
+            // Política de reintentos: 0→HINT_1, 1→HINT_2, ≥2→opciones o DEFAULT_ACCEPT
+            let fb = '';
+            if (attempts < 2 && (cls.kind === 'HINT' || vague || isNo)) {
+              // Mensaje alentador
+              try {
+                const fbCfg: any = (coursePolicies as any)?.feedback || {};
+                const recent = await getRecentHistory(sessionKey, 4);
+                const deterministic = buildDeterministicFeedback();
+                const llmFb = await runDocenteLLM({ language: 'es', action: 'feedback', stepType: 'ASK', questionText: q, userAnswer: pendingInput, matched: cls.matched, missing: cls.missing, objective: String(act.step.data.objective || ''), contentBody: expected, hintWordLimit: Number(fbCfg.maxSentences ?? 3), allowQuestions: fbCfg.allowQuestions !== false, kind: cls.kind as any, recentHistory: recent });
+                fb = [deterministic, llmFb.message || ''].filter(Boolean).join('\n\n');
+              } catch {}
+              const pool = (cls.missing && cls.missing.length ? cls.missing : expected).filter(Boolean).map(String);
               try {
                 const wordLimits = coursePolicies?.hints?.wordLimits || [18,35,60];
                 const limit = wordLimits[0] ?? 18;
+                // Hints con keywords del curso (objetivos + contenido del momento)
+                const moment = state.plan?.moments?.[act.step.momentIndex];
+                const objText = String(state.plan?.meta?.lesson_name || act.step.data.objective || '');
+                const priorTexts: string[] = [];
+                for (const ps of (moment?.steps || []).slice(0, act.step.stepIndex)) {
+                  const d: any = ps.data;
+                  if (Array.isArray(d?.body)) priorTexts.push(...d.body.map((x:any)=>String(x)));
+                  if (Array.isArray(d?.items)) priorTexts.push(...d.items.map((x:any)=>String(x)));
+                  if (d?.text) priorTexts.push(String(d.text));
+                  if (d?.title) priorTexts.push(String(d.title));
+                }
+                const expectedPlus = extractKeywords([objText, ...priorTexts]);
+                // Variación de hint (pool configurable)
+                const variants = Array.isArray(coursePolicies?.hints?.variants) ? coursePolicies?.hints?.variants as string[] : [];
+                const vIdx = (hintsMap[stepCode] || 0) % Math.max(1, variants.length || 1);
+                const variantCue = variants.length ? variants[vIdx] : '';
                 const recent = await getRecentHistory(sessionKey, 4);
-                const llm = await runDocenteLLM({ language: 'es', action: 'hint', stepType: 'ASK', questionText: q, userAnswer: pendingInput, matched: cls.matched, missing: cls.missing, objective: String(act.step.data.objective || ''), contentBody: expected, hintWordLimit: limit, recentHistory: recent });
+                const llm = await runDocenteLLM({ language: 'es', action: 'hint', stepType: 'ASK', questionText: q, userAnswer: pendingInput, matched: cls.matched, missing: cls.missing, objective: String(act.step.data.objective || ''), contentBody: variantCue ? [variantCue, ...expectedPlus] : expectedPlus, hintWordLimit: limit, recentHistory: recent });
                 message = [fb, llm.message].filter(Boolean).join('\n\n');
                 followUp = llm.followUp || '';
               } catch { message = ''; followUp = ''; }
+              // Incrementar hints usados cada vez que emitimos un hint
+              hintsMap[stepCode] = (hintsMap[stepCode] || 0) + 1;
               dbg = { kind: cls.kind, matched: cls.matched?.slice(0,3) || [], missing: cls.missing?.slice(0,3) || [], nextAction: 'hint', stepCode };
               pendingInput = '';
               break;
             }
-            if (nextAction === 'ask_simple') {
-              try {
-                const simpleOptions = (pool.length ? pool : expected).slice(0, 3);
-                const recent = await getRecentHistory(sessionKey, 4);
-                const llm = await runDocenteLLM({ language: 'es', action: 'ask_simple', stepType: 'ASK', questionText: q, objective: String(act.step.data.objective || ''), simpleOptions, recentHistory: recent });
-                message = [fb, llm.message].filter(Boolean).join('\n\n');
-                followUp = '';
-              } catch { message = ''; followUp = ''; }
-              dbg = { kind: cls.kind, matched: cls.matched?.slice(0,3) || [], missing: cls.missing?.slice(0,3) || [], nextAction: 'ask_simple', stepCode };
-              pendingInput = '';
-              break;
+            // DEFAULT_ACCEPT: 3º intento vago o REFOCUS → avanzar a la siguiente ASK (sin opciones)
+            {
+              const nextAskIdx = getNextAskInSameCycle(state, state.stepIdx);
+              if (typeof nextAskIdx === 'number') {
+                state = advanceTo(state, nextAskIdx);
+                followUp = (currentStep(state) as any)?.data?.question || '';
+                state.justAskedFollowUp = Boolean(followUp);
+              }
             }
-            // attempts >= 3
+            // Mensaje de cierre suave
             try {
-              const optionItems = (pool.length ? pool : expected).slice(0, 3);
               const recent = await getRecentHistory(sessionKey, 4);
-              const llm = await runDocenteLLM({ language: 'es', action: (nextAction === 'ask_options' ? 'ask_options' : 'explain') as any, stepType: 'ASK', questionText: q, objective: String(act.step.data.objective || ''), optionItems, recentHistory: recent });
-              message = [fb, llm.message].filter(Boolean).join('\n\n');
-              followUp = '';
-            } catch { message = ''; followUp = ''; }
-            dbg = { kind: cls.kind, matched: cls.matched?.slice(0,3) || [], missing: cls.missing?.slice(0,3) || [], nextAction: nextAction, stepCode };
+              const bridge = await runDocenteLLM({ language: 'es', action: 'advance', stepType: 'ASK', objective: String(act.step.data.objective || ''), recentHistory: recent });
+              message = [fb, bridge.message].filter(Boolean).join('\n\n');
+            } catch {}
+            dbg = { kind: cls.kind, matched: cls.matched?.slice(0,3) || [], missing: cls.missing?.slice(0,3) || [], nextAction: 'advance', stepCode };
             pendingInput = '';
             break;
           }
@@ -445,7 +534,9 @@ export async function POST(req: Request) {
 					messageChars: (message || '').length,
 					followUpChars: (followUp || '').length,
 					hasFollowUp: Boolean(followUp && String(followUp).trim()),
-					userInputLen: (pendingInput || '').length
+					userInputLen: (pendingInput || '').length,
+					thresholds: { jaccardMin: 0.25, semThresh: 0.52, semBest: 0.42 },
+					hintsUsed: Number(state.hintsByAskCode?.[(st as any)?.code || dbg?.stepCode] || 0)
 				};
 				// eslint-disable-next-line no-console
 				console.debug(JSON.stringify(payload));
