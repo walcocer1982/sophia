@@ -1,5 +1,5 @@
 import { runDocenteLLM } from '@/ai/orchestrator';
-import { classifyTurn, type AskPolicy } from '@/engine/eval';
+import { classifyTurn, type AskPolicy, isVagueAnswer, isNoSe } from '@/engine/eval';
 import { decideNextAction } from '@/engine/flow/transition';
 import { extractKeywords } from '@/engine/hints';
 import { advanceTo, currentStep, decideAction, next } from '@/engine/runner';
@@ -219,7 +219,7 @@ export async function POST(req: Request) {
 					expected = extractKeywords(texts);
 				} catch {}
           const momentKind = mapMomentKind(state.plan?.moments?.[act.step.momentIndex]?.title);
-          const maxAttempts = Number(coursePolicies?.advance?.maxAttemptsBeforeForce ?? 999);
+          const maxAttempts = Number(coursePolicies?.advance?.maxAttemptsBeforeForce ?? 2);
           const allowForcedOn: string[] = Array.isArray(coursePolicies?.advance?.allowForcedOn) ? coursePolicies.advance.allowForcedOn : ['SALUDO','CONEXION'];
           const stepCode = act.step.code || `Q:${q.substring(0,50)}`;
           if (!pendingInput.trim()) {
@@ -240,8 +240,10 @@ export async function POST(req: Request) {
             } catch { message = q; }
             break;
           }
-          // Evaluar respuesta del usuario
-          const cls = classifyTurn(pendingInput, policy, acceptable, expected, { maxEditDistance: 1, similarityMin: 0.6 });
+          // Evaluar respuesta del usuario (fuzzy más permisivo para LN)
+          const cls = classifyTurn(pendingInput, policy, acceptable, expected, { maxEditDistance: 1, similarityMin: 0.35 });
+          // Vague/eco: penalizar repeticiones de la consigna
+          const vague = isVagueAnswer(pendingInput, q, { minUsefulTokens: 3, echoOverlap: 0.5 });
                 // En metacognitiva (Saludo) NO aceptar respuestas DONT_KNOW/VAGUE ni por longitud.
                 // La aceptación debe basarse en señales reales del objetivo/expected o acceptable.
           // Feedback determinista breve basado en matched/missing
@@ -256,7 +258,7 @@ export async function POST(req: Request) {
             if (has(cls.missing)) return `Aún no es claro. Intenta mencionar: ${cls.missing.join(', ')}.`;
             return `Aún no es claro. Da un ejemplo o una idea concreta.`;
           };
-          if (cls.kind === 'ACCEPT') {
+          if (!vague && cls.kind === 'ACCEPT') {
             let fb = '';
             try {
               const fbCfg: any = (coursePolicies as any)?.feedback || {};
@@ -330,7 +332,7 @@ export async function POST(req: Request) {
           }
           const attempts = state.attemptsByAskCode[stepCode] || 0;
           const vagueCfg = coursePolicies?.vague || {};
-          if (cls.kind === 'PARTIAL' || cls.kind === 'HINT' || isNo) {
+          if (vague || cls.kind === 'PARTIAL' || cls.kind === 'HINT' || isNo) {
             // Mensaje alentador
             let fb = '';
             try {
@@ -342,16 +344,36 @@ export async function POST(req: Request) {
             } catch {}
             const pool = (cls.missing && cls.missing.length ? cls.missing : expected).filter(Boolean).map(String);
             // Decidir acción de apoyo
+            // Limitar bucle de pistas: máx 2 antes de ask_options
             const lastActionMap = state.lastActionByAskCode || (state.lastActionByAskCode = {});
+            const hintsMap = state.hintsByAskCode || (state.hintsByAskCode = {} as any);
             const lastAction = (lastActionMap[stepCode] as any) || 'ask';
-            const { nextAction } = decideNextAction({ lastAction, classKind: cls.kind as any, attempts, noSeCount: noSeMap[stepCode] || 0, cfg: coursePolicies?.advance });
+            if (lastAction === 'hint') hintsMap[stepCode] = (hintsMap[stepCode] || 0) + 1;
+            const forcedCfg = { ...(coursePolicies?.advance || {}), hintToAskSimple: 1, askSimpleToOptions: 2 };
+            if ((hintsMap[stepCode] || 0) >= 2) {
+              // fuerza opciones
+              lastActionMap[stepCode] = 'ask_options';
+            }
+            const { nextAction } = decideNextAction({ lastAction, classKind: (vague ? 'HINT' : cls.kind) as any, attempts, noSeCount: noSeMap[stepCode] || 0, cfg: forcedCfg });
             lastActionMap[stepCode] = nextAction;
             if (nextAction === 'hint') {
               try {
                 const wordLimits = coursePolicies?.hints?.wordLimits || [18,35,60];
                 const limit = wordLimits[0] ?? 18;
+                // Hints con keywords del curso (objetivos + contenido del momento)
+                const moment = state.plan?.moments?.[act.step.momentIndex];
+                const objText = String(state.plan?.meta?.lesson_name || act.step.data.objective || '');
+                const priorTexts: string[] = [];
+                for (const ps of (moment?.steps || []).slice(0, act.step.stepIndex)) {
+                  const d: any = ps.data;
+                  if (Array.isArray(d?.body)) priorTexts.push(...d.body.map((x:any)=>String(x)));
+                  if (Array.isArray(d?.items)) priorTexts.push(...d.items.map((x:any)=>String(x)));
+                  if (d?.text) priorTexts.push(String(d.text));
+                  if (d?.title) priorTexts.push(String(d.title));
+                }
+                const expectedPlus = extractKeywords([objText, ...priorTexts]);
                 const recent = await getRecentHistory(sessionKey, 4);
-                const llm = await runDocenteLLM({ language: 'es', action: 'hint', stepType: 'ASK', questionText: q, userAnswer: pendingInput, matched: cls.matched, missing: cls.missing, objective: String(act.step.data.objective || ''), contentBody: expected, hintWordLimit: limit, recentHistory: recent });
+                const llm = await runDocenteLLM({ language: 'es', action: 'hint', stepType: 'ASK', questionText: q, userAnswer: pendingInput, matched: cls.matched, missing: cls.missing, objective: String(act.step.data.objective || ''), contentBody: expectedPlus, hintWordLimit: limit, recentHistory: recent });
                 message = [fb, llm.message].filter(Boolean).join('\n\n');
                 followUp = llm.followUp || '';
               } catch { message = ''; followUp = ''; }
