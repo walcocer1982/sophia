@@ -108,8 +108,7 @@ export function buildUserPrompt(ctx: DocentePromptContext): string {
       const limit = ctx.hintWordLimit || 18;
       lines.push(
         `Tarea: primero escribe UNA pista (${limit} palabras aprox., sin signos de interrogación) orientada al OBJETIVO (no listar soluciones ni definiciones generales). ` +
-        `Si la respuesta del estudiante es "no sé", "no lo sé", "ninguna" o equivalente, empieza con UNA frase breve de empatía/normalización; ` +
-        `luego la pista. A continuación, en una línea aparte, UNA sola micro‑pregunta (≤8 palabras) centrada en el objetivo o el primer faltante. Nunca devuelvas solo preguntas.`
+        `Luego, en una línea aparte, UNA sola micro‑pregunta (≤8 palabras) centrada en el objetivo o el primer faltante. Nunca devuelvas solo preguntas.`
       );
       lines.push('Reglas: evita repetir la misma micro‑pregunta usada en el turno previo (usa Historial reciente). No re‑narrar el caso.');
       break;
@@ -200,8 +199,7 @@ export function buildUserPrompt(ctx: DocentePromptContext): string {
         lines.push(
           `Tarea (feedback: HINT): escribe ${limit} frases: ` +
           `1) normaliza la duda y anima a continuar (evita repetir empatía si ya fue usada en el turno previo); ` +
-          `2) da una pista concreta alineada al objetivo (usa Pistas de contenido o el primer Faltante); si el término es extremo/coloquial, reencuadra con lenguaje profesional. No re‑narrar el caso. ` +
-          (allowQ ? `Cierra con UNA micro‑pregunta (≤8 palabras) centrada en el objetivo.` : `No incluyas preguntas.`)
+          `2) da una pista concreta alineada al objetivo (usa Pistas de contenido o el primer Faltante); si el término es extremo/coloquial, reencuadra con lenguaje profesional. No re‑narrar el caso.` + (allowQ ? '' : ` No incluyas preguntas.`)
         );
       }
       break;

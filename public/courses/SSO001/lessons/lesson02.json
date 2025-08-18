@@ -26,9 +26,8 @@
           "question": "¿Qué esperas aprender sobre procedimientos de seguridad en esta sesión?",
           "objective": "Elicitar expectativas del estudiante",
           "answer_type": "open",
-          "rubric": { "min_words": 18, "aspects": ["objetivo","alcance","responsables","recursos","pasos","criterios"] },
-          "expected": ["objetivo","alcance","responsables","recursos","pasos","criterios"],
-          "acceptable_answers": ["partes del procedimiento", "cómo se aplica", "importancia de seguirlos", "selección de EPP", "objetivo", "alcance", "responsables", "recursos", "pasos", "criterios"],
+          "expected": ["experiencias previas", "dudas específicas", "aplicación en el trabajo"],
+          "acceptable_answers": ["partes del procedimiento", "cómo se aplica", "importancia de seguirlos", "selección de EPP"],
           "question_type": "metacognitiva"
         }
       ]
