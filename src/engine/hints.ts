@@ -1,97 +1,210 @@
-const STOPWORDS = new Set(['el','la','los','las','un','una','unos','unas','de','en','y','o','a','para','con','sobre','que','es','son','del','al','por','se','como','mas','más','menos','no','si','sí','qué','cuales','cuáles']);
+type HintPolicies = {
+  mentionCount?: number;
+  wordLimits?: number[]; // [S1, S2, S3]
+  variants?: string[];
+  templates?: {
+    objective?: string;
+    reask?: Record<'list'|'definition'|'procedure'|'choice', string>;
+    open?: { hint: string; reask: string };
+  };
+};
 
-function tokenize(s: string): string[] {
-	return (s || '')
-		.toLowerCase()
-		.normalize('NFD')
-		.replace(/[\u0300-\u036f]/g, '')
-		.replace(/["'()\[\]{}]/g, '')
-		.split(/[^a-záéíóúñ0-9]+/)
-		.filter(Boolean)
-		.filter(w => w.length > 2 && !STOPWORDS.has(w));
+type LangPolicies = { stopwords?: string[] };
+
+export function makeTokenizer(stop: string[] = []) {
+  const STOP = new Set(stop);
+  return (s: string) =>
+    (s || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/["'()\[\]{}]/g, '')
+      .split(/[^a-záéíóúñ0-9]+/)
+      .filter(Boolean)
+      .filter(w => w.length > 2 && !STOP.has(w));
 }
 
-export function extractKeywords(from: string[]): string[] {
-	const out: string[] = [];
-	for (const item of from) {
-		for (const w of tokenize(item)) {
-			if (!out.includes(w)) out.push(w);
-		}
-	}
-	return out.slice(0, 40);
+export function extractKeywords(from: string[], stop: string[] = []): string[] {
+  const tok = makeTokenizer(stop);
+  const uniq: string[] = [];
+  for (const item of from) for (const w of tok(item)) if (!uniq.includes(w)) uniq.push(w);
+  return uniq.slice(0, 40);
 }
 
 export function buildStudentFacingBase(questionText: string, objective: string, expected: string[]): string {
-	// devuelve algo tipo: "aspectos clave de {tema/objetivo}"
-	// usa 'sobre ...' del texto de la pregunta cuando exista
-	return (questionText && questionText.toLowerCase().includes('sobre '))
-		? `lo que esperas aprender sobre ${questionText.split('sobre ')[1].replace(/[?¿.]/g,'').trim()}`
-		: (expected?.[0] || objective || 'el tema actual');
+  return (questionText && questionText.toLowerCase().includes('sobre '))
+    ? `lo que esperas aprender sobre ${questionText.split('sobre ')[1].replace(/[?¿.]/g,'').trim()}`
+    : (expected?.[0] || objective || 'el tema actual');
 }
 
-export function makeObjectiveHint(args: {
-	objective: string;
-	expected: string[];
-	missing: string[];           // del clasificador
-	variants?: string[];         // policies.hints.variants
-	wordLimit?: number;          // policies.hints.wordLimits[0]
+// Nivel de severidad según intentos/pistas
+function severity(attempts: number, hintsUsed: number): 0|1|2 {
+  if (attempts <= 1 && hintsUsed === 0) return 0; // S1
+  if (hintsUsed <= 1) return 1;                    // S2
+  return 2;                                        // S3
+}
+
+export function makeHintMessage(opts: {
+  questionText: string;
+  objective: string;
+  expected: string[];
+  missing: string[];
+  answerType?: 'open'|'list'|'definition'|'procedure'|'choice';
+  hintsUsed: number;
+  attempts: number;
+  coursePolicies?: { hints?: HintPolicies; language?: LangPolicies; feedback?: any };
 }) {
-	const { objective, expected, missing, variants = [], wordLimit = 18 } = args;
-	const cues = (missing && missing.length ? missing : expected).slice(0, 2);
-	const keywords = extractKeywords([objective, ...expected]);
-	const cueLine = cues.length ? `Menciona: ${cues.join(', ')}.` : '';
-	const variantCue = variants.length ? variants[0] : ''; // puedes rotar con hintsUsed
+  const { questionText, objective, expected, missing, answerType = 'list', hintsUsed, attempts, coursePolicies } = opts;
+  const hp = coursePolicies?.hints || {};
+  const lp = coursePolicies?.language || {};
+  const wordLimits = hp.wordLimits || [16, 22, 28];
+  const mentionCount = hp.mentionCount ?? 2;
+  const sev = severity(attempts, hintsUsed);
+  const maxMsgChars = wordLimits[Math.min(sev, wordLimits.length-1)] * 5;
 
-	// 18 palabras aprox; si quieres más, concatena otra línea corta
-	const core = `Enfócate en ${keywords.slice(0, 6).join(', ')}.`;
-	const msg = [variantCue, core, cueLine].filter(Boolean).join(' ').trim();
+  const stop = lp.stopwords || [];
+  const kws = extractKeywords([objective, ...(expected||[])], stop).slice(0, 6);
 
-	return msg.length > (wordLimit * 5) ? msg.slice(0, wordLimit * 5) : msg; // seguro
+  // cues: prioriza missing; si no hay, usa expected
+  const cuesArr = (missing?.length ? missing : expected || []).slice(0, mentionCount);
+  const cueLine = cuesArr.length ? `Menciona: ${cuesArr.join(', ')}.` : '';
+
+  const variants = hp.variants || [];
+  const opener = variants.length ? variants[hintsUsed % variants.length] : '';
+
+  if (answerType === 'open') {
+    const tmpl = hp.templates?.open?.hint || `Comparte tus ideas en al menos {minWords} palabras. {cuesLine}`;
+    const fallbackAspects: string[] = (hp.templates as any)?.open?.fallbackAspects || [];
+    const aspects = cuesArr.length ? cuesArr : fallbackAspects;
+    const cuesLine = aspects.length ? `Guíate por: ${aspects.join(', ')}.` : '';
+    const msg = tmpl
+      .replace('{minWords}', String(wordLimits[0]))
+      .replace('{cuesLine}', cuesLine);
+    // Para preguntas abiertas, evitar cortar el mensaje por caracteres para no truncar frases
+    return msg.trim();
+  }
+
+  const base = hp.templates?.objective || '{opener} Enfócate en {keywords}. {cueLine}';
+  const msg = base
+    .replace('{opener}', opener)
+    .replace('{keywords}', kws.join(', '))
+    .replace('{cueLine}', cueLine);
+
+  return msg.trim().slice(0, maxMsgChars);
+}
+
+export function makeReaskMessage(opts: {
+  questionText: string;
+  objective: string;
+  expected: string[];
+  answerType?: 'open'|'list'|'definition'|'procedure'|'choice';
+  coursePolicies?: { hints?: HintPolicies };
+}) {
+  const { questionText, objective, expected, answerType = 'list', coursePolicies } = opts;
+  const hp = coursePolicies?.hints || {};
+  const baseStr = buildStudentFacingBase(questionText, objective, expected);
+  if (answerType === 'open') {
+    const tmpl = hp.templates?.open?.reask || 'En {minWords}-{maxWords} palabras, cuéntame {aspects} sobre "{objective}".';
+    const minw = (hp.wordLimits || [16])[0];
+    const base = buildStudentFacingBase(questionText, objective, expected);
+    const aspectsLabel = (hp.templates as any)?.open?.aspectsLabel || 'tus ideas principales';
+    return tmpl
+      .replace('{minWords}', String(minw))
+      .replace('{maxWords}', String(minw + 8))
+      .replace('{aspects}', aspectsLabel)
+      .replace('{objective}', base);
+  }
+  const reaskTmpls = (hp.templates?.reask || {}) as Record<'list'|'definition'|'procedure'|'choice', string>;
+  const maxWords = (hp.wordLimits || [16])[0];
+  const map: Record<string, string> = {
+    list: reaskTmpls.list || '',
+    definition: reaskTmpls.definition || '',
+    procedure: reaskTmpls.procedure || '',
+    choice: reaskTmpls.choice || ''
+  };
+  const fallback = `Menciona en ${maxWords} palabras 2 elementos de ${baseStr}.`;
+  return (map[answerType] || '')
+    .replace('{maxWords}', String(maxWords))
+    .replace('{base}', baseStr) || fallback;
+}
+
+// Funciones legacy para compatibilidad - eliminar después de migración
+export function makeObjectiveHint(args: {
+  objective: string;
+  expected: string[];
+  missing: string[];
+  variants?: string[];
+  wordLimit?: number;
+}) {
+  return makeHintMessage({
+    questionText: '',
+    objective: args.objective,
+    expected: args.expected,
+    missing: args.missing,
+    hintsUsed: 0,
+    attempts: 1,
+    coursePolicies: {
+      hints: {
+        variants: args.variants,
+        wordLimits: [args.wordLimit || 16]
+      }
+    }
+  });
 }
 
 export function makeObjectiveReask(args: {
-	questionText: string;
-	objective: string;
-	expected: string[];
-	answerType?: 'list' | 'definition' | 'procedure' | 'choice';
-	maxWords?: number;           // policies.vague.simplifiedAskMaxWords (≈10)
+  questionText: string;
+  objective: string;
+  expected: string[];
+  answerType?: 'list' | 'definition' | 'procedure' | 'choice';
+  maxWords?: number;
 }) {
-	const { questionText, objective, expected, answerType = 'list', maxWords = 10 } = args;
-	const base = buildStudentFacingBase(questionText, objective, expected);
-	let reask = '';
-
-	switch (answerType) {
-		case 'definition':
-			reask = `Define en ${maxWords} palabras ${base}.`;
-			break;
-		case 'procedure':
-			reask = `Enumera en ${maxWords} palabras 2 pasos clave de ${base}.`;
-			break;
-		case 'choice':
-			reask = `Indica en ${maxWords} palabras la opción que aplica sobre ${base}.`;
-			break;
-		default: // 'list'
-			reask = `Menciona en ${maxWords} palabras 2 elementos de ${base}.`;
-	}
-	return reask;
+  return makeReaskMessage({
+    questionText: args.questionText,
+    objective: args.objective,
+    expected: args.expected,
+    answerType: args.answerType,
+    coursePolicies: {
+      hints: {
+        wordLimits: [args.maxWords || 16]
+      }
+    }
+  });
 }
 
 export function makeOpenHint({ objective, aspects = [], minWords = 12 }: {
-	objective: string; aspects?: string[]; minWords?: number;
+  objective: string; aspects?: string[]; minWords?: number;
 }) {
-	const cues = aspects.slice(0,3).join(', ');
-	return [
-		`Comparte tus ideas en al menos ${minWords} palabras.`,
-		`Guíate por: ${cues}.`,
-		`Concéntrate en cómo esto se conecta con tu trabajo.`
-	].join(' ');
+  return makeHintMessage({
+    questionText: '',
+    objective,
+    expected: aspects,
+    missing: [],
+    answerType: 'open',
+    hintsUsed: 0,
+    attempts: 1,
+    coursePolicies: {
+      hints: {
+        wordLimits: [minWords]
+      }
+    }
+  });
 }
 
 export function makeOpenReask({ objective, aspects = [], minWords = 12 }: {
-	objective: string; aspects?: string[]; minWords?: number;
+  objective: string; aspects?: string[]; minWords?: number;
 }) {
-	const a = aspects.length ? aspects.slice(0,2).join(' y ') : 'tus ideas principales';
-	return `En ${minWords}–${minWords+8} palabras, cuéntame ${a} sobre "${objective}".`;
+  return makeReaskMessage({
+    questionText: '',
+    objective,
+    expected: aspects,
+    answerType: 'open',
+    coursePolicies: {
+      hints: {
+        wordLimits: [minWords]
+      }
+    }
+  });
 }
 
 
