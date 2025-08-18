@@ -1,12 +1,15 @@
 import { runDocenteLLM } from '@/ai/orchestrator';
 import { evaluateHybrid, type AskPolicy } from '@/engine/eval';
+import { buildDeterministicFeedback as mkFb } from '@/engine/feedback';
 import { extractKeywords } from '@/engine/hints';
 import { advanceTo, currentStep, decideAction, getNextAskInSameCycle, next } from '@/engine/runner';
 import { loadAndCompile } from '@/plan/compilePlan';
 import { appendHistory, clearHistory, getRecentHistory } from '@/session/history';
 import { SessionState, initSession } from '@/session/state';
 import { getSessionStore } from '@/session/store';
+import fs from 'fs/promises';
 import { NextResponse } from 'next/server';
+import path from 'path';
 
 type ClientState = {
   momentIdx?: number;
@@ -18,13 +21,13 @@ type ClientState = {
   done?: boolean;
 };
 
-type Body = { sessionKey: string; userInput?: string; planUrl?: string; reset?: boolean; clientState?: ClientState };
+type Body = { sessionKey: string; userInput?: string; planUrl?: string; reset?: boolean; clientState?: ClientState; adaptiveMode?: boolean };
 
 const SESSIONS = new Map<string, SessionState>();
 const COURSE_POLICIES_CACHE = new Map<string, any>();
 
 function mapMomentKind(title?: string): 'SALUDO'|'CONEXION'|'ADQUISICION'|'APLICACION'|'DISCUSION'|'REFLEXION'|'OTRO' {
-  const t = (title || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+  const t = (title || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   if (t.includes('saludo')) return 'SALUDO';
   if (t.includes('conexion')) return 'CONEXION';
   if (t.includes('adquisicion')) return 'ADQUISICION';
@@ -42,10 +45,19 @@ function deriveCourseId(planUrl: string): string | undefined {
 async function loadCoursePolicies(courseId?: string) {
   if (!courseId) return undefined;
   if (COURSE_POLICIES_CACHE.has(courseId)) return COURSE_POLICIES_CACHE.get(courseId);
+
   try {
-    const res = await fetch(`/courses/${courseId}/policies.json`);
-    if (!res.ok) return undefined;
-    const json = await res.json();
+    const url = `/courses/${courseId}/policies.json`;
+    let json: any;
+    if (/^https?:/i.test(url)) {                       // remoto
+      const res = await fetch(url);
+      if (!res.ok) return undefined;
+      json = await res.json();
+    } else {                                           // relativo -> public/
+      const filePath = path.join(process.cwd(), 'public', url.replace(/^\//, ''));
+      const raw = await fs.readFile(filePath, 'utf-8');
+      json = JSON.parse(raw);
+    }
     COURSE_POLICIES_CACHE.set(courseId, json);
     return json;
   } catch {
@@ -68,7 +80,7 @@ function buildStudentFacingBase(questionText: string, objective: string, expecte
 export async function POST(req: Request) {
 	try {
 		const body = (await req.json()) as Body;
-		const { sessionKey, userInput = '', planUrl = '/courses/SSO001/lessons/lesson02.json', reset = false, clientState } = body;
+		const { sessionKey, userInput = '', planUrl = '/courses/SSO001/lessons/lesson02.json', reset = false, clientState, adaptiveMode = false } = body;
 		let pendingInput = (userInput || '').toString();
 		if (reset) {
 			SESSIONS.delete(sessionKey);
@@ -76,9 +88,13 @@ export async function POST(req: Request) {
 			try { await clearHistory(sessionKey); } catch {}
 		}
 		let state = (await getSessionStore().get(sessionKey)) || SESSIONS.get(sessionKey);
-    if (!state) {
+    		if (!state) {
 			const plan = await loadAndCompile(planUrl);
 			state = initSession(planUrl, plan);
+			// Aplicar modo adaptativo si se solicita
+			if (adaptiveMode) {
+				state.adaptiveMode = true;
+			}
 			SESSIONS.set(sessionKey, state);
 			try { await getSessionStore().set(sessionKey, state); } catch {}
 		}
@@ -251,37 +267,35 @@ export async function POST(req: Request) {
             acceptable,
             expected,
             policy,
-            { fuzzy: { maxEditDistance: 1, similarityMin: 0.25 }, semThresh: 0.52, semBestThresh: 0.42, maxHints: 2 },
+            					{ fuzzy: { maxEditDistance: 1, similarityMin: 0.25 }, semThresh: 0.48, semBestThresh: 0.40, maxHints: 2 },
             { lastAnswer: state.lastAnswerByAskCode?.[stepCode], hintsUsed }
           );
           const cls = { kind: hybrid.kind, matched: hybrid.matched, missing: hybrid.missing } as const;
           const vague = hybrid.reason === 'VAGUE';
                 // En metacognitiva (Saludo) NO aceptar respuestas DONT_KNOW/VAGUE ni por longitud.
                 // La aceptación debe basarse en señales reales del objetivo/expected o acceptable.
-          // Feedback determinista breve basado en matched/missing
-          const buildDeterministicFeedback = () => {
-            const has = (arr?: string[]) => Array.isArray(arr) && arr.length > 0;
-            if (cls.kind === 'ACCEPT' && has(cls.matched)) return `Bien: mencionaste ${cls.matched.join(', ')}.`;
-            if (cls.kind === 'PARTIAL') {
-              const a = has(cls.matched) ? `acertaste ${cls.matched.join(', ')}` : 'ya estás cerca';
-              const b = has(cls.missing) ? `Te falta incluir ${cls.missing.join(', ')}.` : '';
-              return `Vas bien: ${a}. ${b}`.trim();
-            }
-            // Abridores configurables para variar el feedback (evita repetición)
-            const openers: string[] = (coursePolicies?.feedback?.openers?.hint || []) as string[];
-            const idx = Math.max(0, (attempts % Math.max(1, openers.length)) - 1);
-            const opener = openers[idx] || 'Intenta precisar un poco más.';
-            if (has(cls.missing)) return `${opener} Menciona: ${cls.missing.join(', ')}.`;
-            return `${opener} Da un ejemplo o una idea concreta.`;
-          };
+          // Feedback determinista usando util reutilizable
           if (!vague && cls.kind === 'ACCEPT') {
             let fb = '';
             try {
               const fbCfg: any = (coursePolicies as any)?.feedback || {};
               const recent = await getRecentHistory(sessionKey, 4);
-              const deterministic = buildDeterministicFeedback();
+              const attempts = state.attemptsByAskCode?.[stepCode] || 0;
+              const deterministic = mkFb(
+                { kind: cls.kind, matched: cls.matched, missing: cls.missing },
+                { attempts, hintsUsed, coursePolicies }
+              );
               const llm = await runDocenteLLM({ language: 'es', action: 'feedback', stepType: 'ASK', questionText: q, userAnswer: pendingInput, matched: cls.matched, missing: cls.missing, objective: String(act.step.data.objective || ''), contentBody: expected, hintWordLimit: Number(fbCfg.maxSentences ?? 3), allowQuestions: fbCfg.allowQuestions !== false, kind: 'ACCEPT' as any, recentHistory: recent });
-              fb = [deterministic, llm.message || ''].filter(Boolean).join('\n\n');
+              
+              // Aplicar la misma lógica de priorización LLM
+              const showDeterministic = fbCfg.showDeterministic !== false; // default: true
+              const llmHasContent = llm.message && llm.message.trim().length > 30;
+              
+              if (showDeterministic && !llmHasContent) {
+                fb = deterministic || '';
+              } else {
+                fb = llm.message || '';  // Siempre priorizar LLM
+              }
             } catch {}
             // Avanzar al siguiente paso en orden secuencial (no saltar ASKs)
             state = next(state);
@@ -382,7 +396,7 @@ export async function POST(req: Request) {
           state.lastAnswerByAskCode![stepCode] = pendingInput;
           const noSeMap = state.noSeCountByAskCode || (state.noSeCountByAskCode = {});
           // Detección real de "no sé" / evasivas - MÁS PERMISIVO
-          const isNo = /^\s*(no\s*se|no\s*lo\s*se|no\s*sé|no\s*lo\s*sé|ns|n\/a|no|mmm|mm|ok|si|no\s*est[oó]\s*seguro)\s*$/i.test(pendingInput);
+          const isNo = /^\s*(no\s*(lo\s*)?s[eé]|no\s*est[oó]y?\s*seguro|no\s*s[eé]\s*bien)\s*$/i.test(pendingInput);
           if (isNo) {
             noSeMap[stepCode] = (noSeMap[stepCode] || 0) + 1;
           } else {
@@ -400,7 +414,7 @@ export async function POST(req: Request) {
             
             // Actualizar contadores
             if (cls.kind === 'HINT' || vague || isNo) {
-              if (lastAction === 'hint') hintsMap[stepCode] = currentHints + 1;
+              hintsMap[stepCode] = (currentHints || 0) + 1;   // <— SIEMPRE suma
               lastActionMap[stepCode] = 'hint';
             }
             
@@ -411,9 +425,24 @@ export async function POST(req: Request) {
               try {
                 const fbCfg: any = (coursePolicies as any)?.feedback || {};
                 const recent = await getRecentHistory(sessionKey, 4);
-                const deterministic = buildDeterministicFeedback();
+                const deterministic = mkFb(
+                  { kind: cls.kind, matched: cls.matched, missing: cls.missing },
+                  { attempts, hintsUsed, coursePolicies }
+                );
                 const llmFb = await runDocenteLLM({ language: 'es', action: 'feedback', stepType: 'ASK', questionText: q, userAnswer: pendingInput, matched: cls.matched, missing: cls.missing, objective: String(act.step.data.objective || ''), contentBody: expected, hintWordLimit: Number(fbCfg.maxSentences ?? 3), allowQuestions: fbCfg.allowQuestions !== false, kind: cls.kind as any, recentHistory: recent });
-                fb = [deterministic, llmFb.message || ''].filter(Boolean).join('\n\n');
+                
+                // Siempre priorizar LLM, solo usar determinista como último recurso
+                const showDeterministic = fbCfg.showDeterministic !== false; // default: true
+                const llmHasContent = llmFb.message && llmFb.message.trim().length > 30;
+                
+                // Solo usar determinista si:
+                // 1. Está habilitado
+                // 2. El LLM no proporcionó contenido
+                if (showDeterministic && !llmHasContent) {
+                  fb = deterministic || '';
+                } else {
+                  fb = llmFb.message || '';  // Siempre priorizar LLM
+                }
               } catch {}
               const pool = (cls.missing && cls.missing.length ? cls.missing : expected).filter(Boolean).map(String);
               try {
@@ -535,14 +564,26 @@ export async function POST(req: Request) {
 					followUpChars: (followUp || '').length,
 					hasFollowUp: Boolean(followUp && String(followUp).trim()),
 					userInputLen: (pendingInput || '').length,
-					thresholds: { jaccardMin: 0.25, semThresh: 0.52, semBest: 0.42 },
+					thresholds: { jaccardMin: 0.25, semThresh: 0.48, semBest: 0.40 },
 					hintsUsed: Number(state.hintsByAskCode?.[(st as any)?.code || dbg?.stepCode] || 0)
 				};
 				// eslint-disable-next-line no-console
 				console.debug(JSON.stringify(payload));
 			}
 		} catch {}
-		return NextResponse.json({ message, followUp, state: { stepIdx: state.stepIdx, done: state.done } });
+		// Obtener métricas de presupuesto si está disponible
+		const budgetMetrics = state.budgetCentsLeft !== undefined ? {
+			budgetCentsLeft: state.budgetCentsLeft,
+			escalationsUsed: state.escalationsUsed || 0,
+			adaptiveMode: state.adaptiveMode || false
+		} : null;
+
+		return NextResponse.json({ 
+			message, 
+			followUp, 
+			state: { stepIdx: state.stepIdx, done: state.done },
+			budgetMetrics 
+		});
 	} catch (err: any) {
 		return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
 	}

@@ -15,9 +15,23 @@
     "wordLimits": [18, 35, 60],
     "escalateAfterAttempts": [1, 2, 3]
   },
+
+  "feedback": {
+    "openers": {
+      "hint": [
+        "Considera revisar",
+        "Piensa en",
+        "Recuerda que",
+        "Ten en cuenta"
+      ]
+    },
+    "showDeterministic": false,
+    "maxSentences": 3,
+    "allowQuestions": true
+  },
   "advance": {
-    "allowForcedOn": [],
-    "maxAttemptsBeforeForce": 999
+    "allowForcedOn": ["SALUDO","CONEXION"],
+    "maxAttemptsBeforeForce": 2
   },
   "vague": {
     "minUsefulTokens": 3,
