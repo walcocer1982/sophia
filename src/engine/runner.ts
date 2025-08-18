@@ -1,5 +1,8 @@
 import type { PlanStep } from '@/plan/types';
 import type { SessionState } from '@/session/state';
+import { getBudgetManager } from './costs';
+import { log } from './logger';
+import { applyAdaptCommand, planAdaptation, type PlanningContext } from './planner';
 
 export type SkipAction = { kind: 'skip'; step?: PlanStep };
 export type ExplainAction = { kind: 'explain'; step: PlanStep };
@@ -14,8 +17,39 @@ export function currentStep(state?: SessionState): PlanStep | undefined {
 	return steps[state.stepIdx];
 }
 
-export function decideAction(step?: PlanStep): EngineAction {
+export function decideAction(step?: PlanStep, state?: SessionState): EngineAction {
 	if (!step) return { kind: 'end' };
+	
+			// Si el modo adaptativo está activado y es un paso ASK, consultar al planificador
+		if (state?.adaptiveMode && step.type === 'ASK') {
+			const budgetManager = getBudgetManager();
+			const metrics = budgetManager.getUsageMetrics();
+			
+			// Obtener historial corto para el contexto
+			const shortHistory: Array<{
+				stepIdx: number;
+				action: string;
+				response?: string;
+			}> = []; // TODO: Implementar historial real cuando se necesite
+			
+			const context: PlanningContext = {
+				state: state,
+				shortHistory,
+				budgetCentsLeft: metrics.budgetCentsLeft,
+				escalationsUsed: state.escalationsUsed || 0
+			};
+			
+			const adaptation = planAdaptation(context);
+			if (adaptation) {
+				// Aplicar la adaptación al estado
+				const adaptedState = applyAdaptCommand(adaptation, state);
+				// Actualizar el estado global con la adaptación
+				Object.assign(state, adaptedState);
+				// Log de adaptación aplicada
+				log.adaptation('session-' + Date.now(), adaptation);
+			}
+		}
+	
 	switch (step.type) {
 		case 'ASK':
 			return { kind: 'ask', step };
@@ -96,6 +130,38 @@ export function getFirstAskOfNextCycle(state: SessionState, stepIdx: number): nu
     if (askList.length > 0) return askList[0];
   }
   return undefined;
+}
+
+export function decideNextAction(context: {
+  lastAction: string;
+  noSeCount: number;
+  attempts: number;
+  momentKind?: string;
+}): 'reask' | 'hint' | 'explain' | 'options' | 'force_advance' {
+  const { lastAction, noSeCount, attempts, momentKind } = context;
+  
+  // Solo permitir avance forzado en CONEXIÓN (no SALUDO)
+  const policyAllowsForce = ['CONEXION'].includes(momentKind || '');
+  
+  // Si no permite forzar y hay muchos intentos, usar transición pedagógica
+  if (!policyAllowsForce && attempts >= 2) {
+    if (lastAction === 'hint') return 'explain';
+    if (lastAction === 'explain') return 'options';
+    if (lastAction === 'options') return 'reask';
+    return 'hint';
+  }
+  
+  // Si permite forzar, solo después de agotar opciones (umbral más alto)
+  if (policyAllowsForce && attempts >= 4) {
+    return 'force_advance';
+  }
+  
+  // Lógica normal de transición
+  if (noSeCount > 0) return 'hint';
+  if (lastAction === 'hint') return 'explain';
+  if (lastAction === 'explain') return 'options';
+  
+  return 'reask';
 }
 
 

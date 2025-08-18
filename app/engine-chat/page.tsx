@@ -20,7 +20,7 @@ export default function EngineChatPage() {
     return lesson?.planUrl || null;
   }, [registry, selectedCourseId, selectedLessonId]);
 
-  const { messages, isTyping, done, sendMessage, clearMessages } = usePlanChat(planUrl || '/courses/SSO001/lessons/lesson02.json');
+  const { messages, isTyping, done, sendMessage, clearMessages, adaptiveMode, setAdaptiveMode, budgetMetrics } = usePlanChat(planUrl || '/courses/SSO001/lessons/lesson02.json');
 
   useEffect(() => {
     let alive = true;
@@ -88,6 +88,36 @@ export default function EngineChatPage() {
               <button onClick={() => clearMessages()} className="border rounded-lg px-3 py-2">Nueva sesión</button>
               {done && <span className="text-green-600 text-sm">Fin de la lección</span>}
             </div>
+          </div>
+          
+          {/* Controles de modo adaptativo y presupuesto */}
+          <div className="flex items-center gap-4 border-t pt-4 mt-4">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium">Modo:</label>
+              <select 
+                value={adaptiveMode ? 'adaptive' : 'deterministic'} 
+                onChange={(e) => setAdaptiveMode(e.target.value === 'adaptive')}
+                className="border rounded-lg px-2 py-1 text-sm"
+              >
+                <option value="deterministic">Determinista</option>
+                <option value="adaptive">Adaptativo</option>
+              </select>
+            </div>
+            
+            {budgetMetrics && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Presupuesto:</span>
+                <div className="w-32 bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${(budgetMetrics.budgetCentsLeft / 100) * 100}%` }}
+                  ></div>
+                </div>
+                <span className="text-xs text-gray-600">
+                  ${(budgetMetrics.budgetCentsLeft / 100).toFixed(2)}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 

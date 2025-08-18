@@ -7,8 +7,10 @@ export const TimelineStepSchema = z.object({
 	// ASK
 	question: z.string().optional(),
 	objective: z.string().optional(),
+	expected: z.array(z.string()).optional(),
 	acceptable_answers: z.array(z.string()).optional(),
 	question_type: z.string().optional(),
+	answer_type: z.enum(['open', 'list', 'definition', 'procedure', 'choice']).optional(),
 	// CONTENT / CASE / NARRATION / KEY_* / TOPICS / REFLECTION_AREAS
 	title: z.string().optional(),
 	body: z.array(z.string()).optional(),

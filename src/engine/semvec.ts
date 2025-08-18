@@ -1,7 +1,7 @@
-import { getClient, pickModel } from '@/lib/ai';
+import { getClient } from '@/lib/ai';
+import { getBudgetManager, pickModelWithBudget } from './costs';
 
 const client = getClient();
-const MODEL = pickModel('embed');
 
 export type AskVectorIndex = {
 	acceptables: string[];
@@ -22,7 +22,14 @@ function cosine(a: number[], b: number[]): number {
 
 export async function embedTexts(texts: string[]): Promise<number[][]> {
 	if (!texts || texts.length === 0) return [];
-	const res = await client.embeddings.create({ model: MODEL as any, input: texts });
+	const model = pickModelWithBudget('embed');
+	const res = await client.embeddings.create({ model: model as any, input: texts });
+	
+	// Registrar uso de embeddings para costeo
+	const budgetManager = getBudgetManager();
+	const approxTokens = texts.reduce((total, text) => total + Math.ceil(text.length / 4), 0);
+	budgetManager.recordUsage('embed', approxTokens);
+	
 	return res.data.map(x => (x as any).embedding as number[]);
 }
 

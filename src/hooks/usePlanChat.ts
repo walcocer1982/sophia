@@ -10,6 +10,8 @@ export function usePlanChat(planUrl: string = '/courses/SSO001/lessons/lesson02.
 	const [messages, setMessages] = useState<PlanChatMessage[]>([]);
 	const [isTyping, setIsTyping] = useState<boolean>(false);
 	const [done, setDone] = useState<boolean>(false);
+	const [adaptiveMode, setAdaptiveMode] = useState<boolean>(false);
+	const [budgetMetrics, setBudgetMetrics] = useState<any>(null);
 	const sessionKeyRef = useRef<string>('');
 	const idSeq = useRef<number>(1);
   const bootedRef = useRef<boolean>(false);
@@ -43,24 +45,42 @@ export function usePlanChat(planUrl: string = '/courses/SSO001/lessons/lesson02.
 			const res = await fetch('/api/engine/turn', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ sessionKey: sessionKeyRef.current, userInput, planUrl, reset: !messages.length })
+				body: JSON.stringify({ 
+					sessionKey: sessionKeyRef.current, 
+					userInput, 
+					planUrl, 
+					reset: !messages.length,
+					adaptiveMode 
+				})
 			});
 			if (!res.ok) throw new Error('engine turn failed');
-			const { message, followUp, state } = await res.json();
-			const chunks = [message, followUp].filter(Boolean) as string[];
+			const { message, followUp, state, budgetMetrics: newBudgetMetrics } = await res.json();
+			
+			// Agregar mensaje del estudiante si hay input
 			if (userInput && userInput.trim()) {
 				setMessages(prev => [...prev, { id: `${idSeq.current++}`, sender: 'student', content: userInput, timestamp: new Date() }]);
 			}
-			if (chunks.length) {
+			
+			// Crear UNA sola burbuja del asistente (message + followUp)
+			if (message || followUp) {
+				const norm = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase();
+				const hasQ = followUp && norm(message || '').includes(norm(followUp));
+				const combined = [message, (!hasQ && followUp) ? followUp : '']
+					.map(s => (s || '').trim())
+					.filter(Boolean)
+					.join('\n\n');
+				
+				// Evitar repetir exactamente el mismo texto que la última burbuja del assistant
 				setMessages(prev => {
-					let out = prev;
-					for (const c of chunks) {
-						out = [...out, { id: `${idSeq.current++}`, sender: 'ai', content: c, timestamp: new Date() }];
-					}
-					return out;
+					const last = prev.slice().reverse().find(m => m.sender === 'ai');
+					if (last && norm(last.content) === norm(combined)) return prev;
+					return [...prev, { id: `${idSeq.current++}`, sender: 'ai', content: combined, timestamp: new Date() }];
 				});
 			}
 			setDone(Boolean(state?.done));
+			if (newBudgetMetrics) {
+				setBudgetMetrics(newBudgetMetrics);
+			}
 		} catch (_err) {
 			// Emitir mensaje de error simple
 			setMessages(prev => [...prev, { id: `${idSeq.current++}`, sender: 'ai', content: 'Ocurrió un error al avanzar el plan.', timestamp: new Date() }]);
@@ -78,7 +98,26 @@ export function usePlanChat(planUrl: string = '/courses/SSO001/lessons/lesson02.
 		setMessages([]);
 	}
 
-	return { messages, isTyping, done, sendMessage, clearMessages };
+	function resetSession() {
+		// Limpiar sessionStorage y regenerar sessionKey
+		if (typeof window !== 'undefined') {
+			window.sessionStorage.removeItem('planSessionKey');
+		}
+		sessionKeyRef.current = generateSessionKey();
+		if (typeof window !== 'undefined') {
+			window.sessionStorage.setItem('planSessionKey', sessionKeyRef.current);
+		}
+		// Resetear estado
+		setMessages([]);
+		setDone(false);
+		setIsTyping(false);
+		setBudgetMetrics(null);
+		bootedRef.current = false;
+		// Reiniciar con nuevo plan
+		void turn('');
+	}
+
+	return { messages, isTyping, done, sendMessage, clearMessages, resetSession, adaptiveMode, setAdaptiveMode, budgetMetrics };
 }
 
 

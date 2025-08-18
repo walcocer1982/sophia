@@ -2,10 +2,10 @@ export function normalize(input: string): string {
 	return (input || '')
 		.toLowerCase()
 		.normalize('NFD')
-		.replace(/\p{Diacritic}/gu, '')
+		.replace(/[\u0300-\u036f]/g, '')
 		// Colapsa repeticiones largas de caracteres: accidenteee -> accidentee
 		.replace(/([a-zñ])\1{2,}/g, '$1$1')
-		.replace(/[^\p{L}\p{N}\s]/gu, ' ')
+		.replace(/[^\w\s]/g, ' ')
 		.replace(/\s+/g, ' ')
 		.trim();
 }
@@ -185,8 +185,27 @@ export function isNoSe(answer?: string): boolean {
 	];
 	if (patterns.some(rx => rx.test(a))) return true;
 	const words = a.split(/\s+/).filter(Boolean);
-	return words.length <= 1; // MÁS PERMISIVO: solo 1 palabra
+	return false; // deja solo patrones explícitos (no, no sé, n/a, mmm…)
 }
+
+export function detectTopicDeviation(
+	studentResponse: string,
+	currentStep: any,
+	objective: string
+): 'ON_TOPIC' | 'VAGUE' | 'OFF_TOPIC' {
+	const response = studentResponse.toLowerCase().trim();
+	const objectiveWords = objective.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+	
+	// Palabras clave del objetivo presentes
+	const objectiveMatches = objectiveWords.filter(word => response.includes(word));
+	const matchRatio = objectiveMatches.length / Math.max(1, objectiveWords.length);
+	
+	if (matchRatio >= 0.3) return 'ON_TOPIC';
+	if (matchRatio >= 0.1) return 'VAGUE';
+	return 'OFF_TOPIC';
+}
+
+
 
 // Evaluación híbrida (vaguedad → rápido → semántico)
 import { escalateReasoning } from '@/engine/eval-escalation';
@@ -219,7 +238,7 @@ export async function evaluateHybrid(
       case 'listado':
         return { semThresh: 0.46, semBestThresh: 0.36 };
       default:
-        return { semThresh: opts.semThresh ?? 0.52, semBestThresh: opts.semBestThresh ?? 0.42 };
+        	return { semThresh: opts.semThresh ?? 0.48, semBestThresh: opts.semBestThresh ?? 0.40 };
     }
   };
   

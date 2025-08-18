@@ -53,3 +53,7 @@ temp/
 
 # Optional REPL history
 .node_repl_history
+
+# Session data (runtime)
+.data/sessions.json
+.data/history/
