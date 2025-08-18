@@ -20,6 +20,22 @@ export type SessionState = {
 	askedAskCodes: string[];
 	answeredAskCodes: string[];
 	done: boolean;
+	// Nuevos campos para adaptación y presupuesto
+	dynamicQueue: Array<{
+		op: 'reask' | 'hint' | 'goto' | 'repeat' | 'insert_micro';
+		targetAskCode?: string;
+		note?: string;
+		reason?: 'SEM_LOW' | 'THINKER_ESCALATION' | 'OFF_TOPIC' | 'BUDGET_LIMIT';
+	}>;
+	budgetCentsLeft: number;
+	escalationsUsed: number;
+	// Modo de operación
+	adaptiveMode: boolean;
+	// Contexto de consultas para pausar/retomar
+	consultCtx?: {
+		pausedAt?: { momentIndex: number; stepIndex: number };
+	};
+	lastFollowUpText?: string;
 };
 
 export function initSession(planUrl: string, plan: LessonPlan): SessionState {
@@ -40,7 +56,13 @@ export function initSession(planUrl: string, plan: LessonPlan): SessionState {
 		shownByMomentIndex: {},
 		askedAskCodes: [],
 		answeredAskCodes: [],
-		done: false
+		done: false,
+		// Inicializar nuevos campos
+		dynamicQueue: [],
+		budgetCentsLeft: 100, // 100 centavos = $1.00 por sesión
+		escalationsUsed: 0,
+		adaptiveMode: false, // Por defecto modo determinista
+		consultCtx: {} // Contexto de consultas
 	};
 }
 

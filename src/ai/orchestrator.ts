@@ -19,11 +19,11 @@ function lastQuestion(text?: string): string {
 
 function normalizeForMatch(s: string): string {
   return s
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+    		.toLowerCase()
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '')
+		.replace(/\s+/g, ' ')
+		.trim();
 }
 
 // Anti re‑narración: elimina párrafos exactos presentes en el historial reciente

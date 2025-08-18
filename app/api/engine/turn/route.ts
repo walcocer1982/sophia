@@ -1,12 +1,16 @@
 import { runDocenteLLM } from '@/ai/orchestrator';
-import { evaluateHybrid, type AskPolicy } from '@/engine/eval';
-import { extractKeywords } from '@/engine/hints';
-import { advanceTo, currentStep, decideAction, getNextAskInSameCycle, next } from '@/engine/runner';
+import { detectTopicDeviation, evaluateHybrid, type AskPolicy } from '@/engine/eval';
+import { buildDeterministicFeedback as mkFb } from '@/engine/feedback';
+import { extractKeywords, makeObjectiveHint, makeObjectiveReask, makeOpenHint, makeOpenReask } from '@/engine/hints';
+import { isAffirmativeToResume, isStudentAskingQuestion } from '@/engine/questions';
+import { advanceTo, currentStep, decideAction, decideNextAction, getNextAskInSameCycle, next } from '@/engine/runner';
 import { loadAndCompile } from '@/plan/compilePlan';
 import { appendHistory, clearHistory, getRecentHistory } from '@/session/history';
 import { SessionState, initSession } from '@/session/state';
 import { getSessionStore } from '@/session/store';
+import fs from 'fs/promises';
 import { NextResponse } from 'next/server';
+import path from 'path';
 
 type ClientState = {
   momentIdx?: number;
@@ -18,13 +22,13 @@ type ClientState = {
   done?: boolean;
 };
 
-type Body = { sessionKey: string; userInput?: string; planUrl?: string; reset?: boolean; clientState?: ClientState };
+type Body = { sessionKey: string; userInput?: string; planUrl?: string; reset?: boolean; clientState?: ClientState; adaptiveMode?: boolean };
 
 const SESSIONS = new Map<string, SessionState>();
 const COURSE_POLICIES_CACHE = new Map<string, any>();
 
 function mapMomentKind(title?: string): 'SALUDO'|'CONEXION'|'ADQUISICION'|'APLICACION'|'DISCUSION'|'REFLEXION'|'OTRO' {
-  const t = (title || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+  const t = (title || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   if (t.includes('saludo')) return 'SALUDO';
   if (t.includes('conexion')) return 'CONEXION';
   if (t.includes('adquisicion')) return 'ADQUISICION';
@@ -42,10 +46,19 @@ function deriveCourseId(planUrl: string): string | undefined {
 async function loadCoursePolicies(courseId?: string) {
   if (!courseId) return undefined;
   if (COURSE_POLICIES_CACHE.has(courseId)) return COURSE_POLICIES_CACHE.get(courseId);
+
   try {
-    const res = await fetch(`/courses/${courseId}/policies.json`);
-    if (!res.ok) return undefined;
-    const json = await res.json();
+    const url = `/courses/${courseId}/policies.json`;
+    let json: any;
+    if (/^https?:/i.test(url)) {                       // remoto
+      const res = await fetch(url);
+      if (!res.ok) return undefined;
+      json = await res.json();
+    } else {                                           // relativo -> public/
+      const filePath = path.join(process.cwd(), 'public', url.replace(/^\//, ''));
+      const raw = await fs.readFile(filePath, 'utf-8');
+      json = JSON.parse(raw);
+    }
     COURSE_POLICIES_CACHE.set(courseId, json);
     return json;
   } catch {
@@ -68,7 +81,7 @@ function buildStudentFacingBase(questionText: string, objective: string, expecte
 export async function POST(req: Request) {
 	try {
 		const body = (await req.json()) as Body;
-		const { sessionKey, userInput = '', planUrl = '/courses/SSO001/lessons/lesson02.json', reset = false, clientState } = body;
+		const { sessionKey, userInput = '', planUrl = '/courses/SSO001/lessons/lesson02.json', reset = false, clientState, adaptiveMode = false } = body;
 		let pendingInput = (userInput || '').toString();
 		if (reset) {
 			SESSIONS.delete(sessionKey);
@@ -76,9 +89,13 @@ export async function POST(req: Request) {
 			try { await clearHistory(sessionKey); } catch {}
 		}
 		let state = (await getSessionStore().get(sessionKey)) || SESSIONS.get(sessionKey);
-    if (!state) {
+    		if (!state) {
 			const plan = await loadAndCompile(planUrl);
 			state = initSession(planUrl, plan);
+			// Aplicar modo adaptativo si se solicita
+			if (adaptiveMode) {
+				state.adaptiveMode = true;
+			}
 			SESSIONS.set(sessionKey, state);
 			try { await getSessionStore().set(sessionKey, state); } catch {}
 		}
@@ -100,7 +117,7 @@ export async function POST(req: Request) {
           state.stepIdx = sIdx;
         }
       }
-      state.attemptsByAskCode = { ...state.attemptsByAskCode, ...(clientState.attemptsByAskCode || {}) };
+      state.attemptsByAskCode = { ...(state.attemptsByAskCode || {}), ...(clientState.attemptsByAskCode || {}) };
       state.noSeCountByAskCode = { ...(state.noSeCountByAskCode || {}), ...(clientState.noSeCountByAskCode || {}) };
       state.lastActionByAskCode = { ...(state.lastActionByAskCode || {}), ...(clientState.lastActionByAskCode || {}) };
       state.lastAnswerByAskCode = { ...(state.lastAnswerByAskCode || {}), ...(clientState.lastAnswerByAskCode || {}) };
@@ -128,9 +145,79 @@ export async function POST(req: Request) {
 				console.debug(JSON.stringify(payload0));
 			}
 		} catch {}
-		// Bucle: saltar SKIP consecutivos y construir salida adecuada
+		
+		// Interceptor universal de consultas (antes de evaluar el ASK)
+		state.consultCtx = state.consultCtx || {};
+		
+		// Variables de salida
 		let message = '';
 		let followUp = '';
+		
+		// --- REEMITIR REPREGUNTA SI AÚN NO RESPONDE (continuidad) ---
+		if (!pendingInput.trim() && state.justAskedFollowUp && state.lastFollowUpText) {
+			return NextResponse.json({
+				message: '',
+				followUp: state.lastFollowUpText,
+				state
+			});
+		}
+		
+		// 1) Si el alumno pide "permiso" para preguntar (p.ej. "te puedo hacer una pregunta"):
+		if (isStudentAskingQuestion(pendingInput) && !/\w+\?/.test(pendingInput)) {
+			message = '¡Claro! Dime cuál es tu consulta y, cuando quede claro, me lo confirmas para continuar con la clase.';
+			// "pausa": recuerda dónde estás para retomar
+			state.consultCtx.pausedAt = { momentIndex: state.momentIdx!, stepIndex: state.stepIdx! };
+			// Debug log
+			if (process.env.ENGINE_DEBUG === 'true') {
+				console.log('[CONSULTA_INTENCION]', { pausedAt: state.consultCtx.pausedAt });
+			}
+			// No avances el plan ni evalúes; solo responde
+			return NextResponse.json({ message, followUp: '', state });
+		}
+		
+		// 2) Si trae una pregunta concreta (termina en ? o contiene palabras de pregunta):
+		if (isStudentAskingQuestion(pendingInput) && /\w+\?/.test(pendingInput)) {
+			const recent = await getRecentHistory(sessionKey, 6);
+			const qa = await runDocenteLLM({
+				language: 'es',
+				action: 'feedback',
+				stepType: 'ASK',
+				questionText: pendingInput,
+				objective: String(state.plan?.meta?.lesson_name || ''),
+				recentHistory: recent
+			});
+			message = (qa.message || '').trim();
+			// pides confirmación para retomar
+			const tail = '\n\n¿Te quedó claro? Responde "sí" para continuar o formula otra pregunta.';
+			// Debug log
+			if (process.env.ENGINE_DEBUG === 'true') {
+				console.log('[CONSULTA_QA]', { len: message.length });
+			}
+			return NextResponse.json({ message: message + tail, followUp: '', state });
+		}
+		
+		// 3) Si el alumno confirma que ya entendió, retomas donde quedó
+		if (state.consultCtx.pausedAt && isAffirmativeToResume(pendingInput)) {
+			// Debug log
+			if (process.env.ENGINE_DEBUG === 'true') {
+				console.log('[CONSULTA_RESUME]', { resumedFrom: state.consultCtx.pausedAt });
+			}
+			// Limpiar contexto de pausa
+			state.consultCtx.pausedAt = undefined;
+			
+			// Si estamos sobre una ASK, re-emitirla ya
+			const st = currentStep(state);
+			if (st?.type === 'ASK') {
+				const q = st.data?.question || '';
+				message = 'Perfecto, retomemos.';
+				followUp = q;
+				state.justAskedFollowUp = Boolean(followUp);
+				return NextResponse.json({ message, followUp, state });
+			}
+			// Si no es ASK, continúa flujo normal
+		}
+		
+		// Bucle: saltar SKIP consecutivos y construir salida adecuada
 		// Debug vars
 		let dbg: any = null;
 		let safety = 0;
@@ -224,7 +311,7 @@ export async function POST(req: Request) {
 				} catch {}
           const momentKind = mapMomentKind(state.plan?.moments?.[act.step.momentIndex]?.title);
           const maxAttempts = Number(coursePolicies?.advance?.maxAttemptsBeforeForce ?? 2);
-          const allowForcedOn: string[] = Array.isArray(coursePolicies?.advance?.allowForcedOn) ? coursePolicies.advance.allowForcedOn : ['SALUDO','CONEXION'];
+          const allowForcedOn: string[] = Array.isArray(coursePolicies?.advance?.allowForcedOn) ? coursePolicies.advance.allowForcedOn : ['CONEXION'];
           const stepCode = act.step.code || `Q:${q.substring(0,50)}`;
           if (!pendingInput.trim()) {
             // evitar eco si acabamos de adjuntar followUp
@@ -244,45 +331,131 @@ export async function POST(req: Request) {
 					} catch { message = q; }
 					break;
 				}
-          // Evaluación híbrida: vaguedad → rápido → semántica (embeddings bajo demanda)
+          // Evaluación para preguntas abiertas (answer_type: "open")
+          const answerType = (act.step.data as any)?.answer_type || '';
+          const rubric = (act.step.data as any)?.rubric || {};
+          const objText = String(act.step.data?.objective || '');
+          
+          let cls: any;
+          let vague: boolean;
           const hintsUsed = Number(state.hintsByAskCode?.[stepCode] || 0);
-          const hybrid = await evaluateHybrid(
-            pendingInput,
-            acceptable,
-            expected,
-            policy,
-            { fuzzy: { maxEditDistance: 1, similarityMin: 0.25 }, semThresh: 0.52, semBestThresh: 0.42, maxHints: 2 },
-            { lastAnswer: state.lastAnswerByAskCode?.[stepCode], hintsUsed }
-          );
-          const cls = { kind: hybrid.kind, matched: hybrid.matched, missing: hybrid.missing } as const;
-          const vague = hybrid.reason === 'VAGUE';
-                // En metacognitiva (Saludo) NO aceptar respuestas DONT_KNOW/VAGUE ni por longitud.
-                // La aceptación debe basarse en señales reales del objetivo/expected o acceptable.
-          // Feedback determinista breve basado en matched/missing
-          const buildDeterministicFeedback = () => {
-            const has = (arr?: string[]) => Array.isArray(arr) && arr.length > 0;
-            if (cls.kind === 'ACCEPT' && has(cls.matched)) return `Bien: mencionaste ${cls.matched.join(', ')}.`;
-            if (cls.kind === 'PARTIAL') {
-              const a = has(cls.matched) ? `acertaste ${cls.matched.join(', ')}` : 'ya estás cerca';
-              const b = has(cls.missing) ? `Te falta incluir ${cls.missing.join(', ')}.` : '';
-              return `Vas bien: ${a}. ${b}`.trim();
+          
+          if (answerType === 'open') {
+            // 1) Reglas rápidas: longitud y "en tema"
+            const text = (pendingInput || '').trim();
+            const minWords = Number(rubric.min_words ?? 12);
+            const words = text.split(/\s+/).filter(Boolean);
+            const tooShort = words.length < minWords;
+
+            // 2) ON_TOPIC / VAGUE / OFF_TOPIC con detectTopicDeviation
+            const deviation = detectTopicDeviation(text, act.step, objText);
+
+            if (!text || tooShort || deviation === 'OFF_TOPIC') {
+              // HINT objetivo-primero para preguntas abiertas
+              const hintMsg = makeOpenHint({
+                objective: objText,
+                aspects: rubric.aspects || ['experiencias previas', 'dudas específicas', 'aplicación en el trabajo'],
+                minWords
+              });
+              const reask = makeOpenReask({ 
+                objective: objText, 
+                aspects: rubric.aspects || ['experiencias previas', 'dudas específicas'], 
+                minWords 
+              });
+              message = hintMsg;
+              followUp = reask;
+              state.justAskedFollowUp = true;
+              state.lastFollowUpText = followUp;
+              pendingInput = '';
+              break;
             }
-            // Abridores configurables para variar el feedback (evita repetición)
-            const openers: string[] = (coursePolicies?.feedback?.openers?.hint || []) as string[];
-            const idx = Math.max(0, (attempts % Math.max(1, openers.length)) - 1);
-            const opener = openers[idx] || 'Intenta precisar un poco más.';
-            if (has(cls.missing)) return `${opener} Menciona: ${cls.missing.join(', ')}.`;
-            return `${opener} Da un ejemplo o una idea concreta.`;
-          };
+
+            // 3) Aceptar reflexión abierta
+            cls = { kind: 'ACCEPT', reason: 'OPEN_OK', matched: [], missing: [] };
+            vague = false;
+          } else {
+            // Evaluación híbrida: vaguedad → rápido → semántica (embeddings bajo demanda)
+            const hybrid = await evaluateHybrid(
+              pendingInput,
+              acceptable,
+              expected,
+              policy,
+              { fuzzy: { maxEditDistance: 1, similarityMin: 0.25 }, semThresh: 0.48, semBestThresh: 0.40, maxHints: 2 },
+              { lastAnswer: state.lastAnswerByAskCode?.[stepCode], hintsUsed }
+            );
+            cls = { kind: hybrid.kind, matched: hybrid.matched, missing: hybrid.missing };
+            vague = hybrid.reason === 'VAGUE';
+          }
+          
+          // Endurecer aceptación en SALUDO/CONEXIÓN (evitar falsos ACCEPT)
+          const isSaludoConexion = ['SALUDO','CONEXION'].includes(momentKind);
+          const isMeta = String(qtype).includes('abierta') || isSaludoConexion;
+          
+          // endurecer aceptación en metacognitivas
+          if (isMeta && cls.kind === 'ACCEPT') {
+            const matchedCount = (cls.matched || []).length;
+            // exige evidencia mínima: dos señales o mayor umbral semántico
+            const strongEnough = matchedCount >= 2; // puedes subir a >=3 si aún acepta de más
+            if (!strongEnough) {
+              // rebaja a HINT para mantener la ASK
+              (cls as any).kind = 'HINT';
+            }
+          }
+          
+          // En metacognitiva (Saludo) NO aceptar respuestas DONT_KNOW/VAGUE ni por longitud.
+          // La aceptación debe basarse en señales reales del objetivo/expected o acceptable.
+          // Feedback determinista usando util reutilizable
           if (!vague && cls.kind === 'ACCEPT') {
             let fb = '';
             try {
               const fbCfg: any = (coursePolicies as any)?.feedback || {};
               const recent = await getRecentHistory(sessionKey, 4);
-              const deterministic = buildDeterministicFeedback();
+              const attempts = state.attemptsByAskCode?.[stepCode] || 0;
+              const deterministic = mkFb(
+                { kind: cls.kind, matched: cls.matched, missing: cls.missing },
+                { attempts, hintsUsed, coursePolicies }
+              );
               const llm = await runDocenteLLM({ language: 'es', action: 'feedback', stepType: 'ASK', questionText: q, userAnswer: pendingInput, matched: cls.matched, missing: cls.missing, objective: String(act.step.data.objective || ''), contentBody: expected, hintWordLimit: Number(fbCfg.maxSentences ?? 3), allowQuestions: fbCfg.allowQuestions !== false, kind: 'ACCEPT' as any, recentHistory: recent });
-              fb = [deterministic, llm.message || ''].filter(Boolean).join('\n\n');
+              
+              // Aplicar la misma lógica de priorización LLM
+              const showDeterministic = fbCfg.showDeterministic !== false; // default: true
+              const llmHasContent = llm.message && llm.message.trim().length > 30;
+              
+              if (showDeterministic && !llmHasContent) {
+                fb = deterministic || '';
+              } else {
+                fb = llm.message || '';  // Siempre priorizar LLM
+              }
             } catch {}
+            
+            // ✅ Marcar cumplimiento de la ASK actual
+            state.answeredAskCodes = Array.isArray(state.answeredAskCodes) ? state.answeredAskCodes : [];
+            const code = act.step.data?.code || stepCode;
+            if (!state.answeredAskCodes.includes(code)) {
+              state.answeredAskCodes.push(code);
+            }
+            SESSIONS.set(sessionKey, state);
+            try { await getSessionStore().set(sessionKey, state); } catch {}
+            
+            // Protección de cumplimiento: verificar que la ASK actual esté respondida antes de avanzar
+            const currentStepCode = act.step.data?.code || '';
+            const isAnswered = state.answeredAskCodes?.includes(currentStepCode);
+            
+            if (!isAnswered && act.step.type === 'ASK') {
+              // No avanzar si la ASK actual no está respondida (excepto SALUDO/CONEXIÓN)
+              const momentKind = state.plan?.moments?.[act.step.momentIndex]?.code || '';
+              const policyAllowsForce = ['SALUDO', 'CONEXION'].includes(momentKind);
+              
+              if (!policyAllowsForce) {
+                // Re-preguntar la ASK actual
+                followUp = q;
+                state.justAskedFollowUp = Boolean(followUp);
+                dbg = { kind: cls.kind, matched: cls.matched?.slice(0,3) || [], missing: cls.missing?.slice(0,3) || [], nextAction: 'reask', stepCode };
+                pendingInput = '';
+                break;
+              }
+            }
+            
             // Avanzar al siguiente paso en orden secuencial (no saltar ASKs)
             state = next(state);
             SESSIONS.set(sessionKey, state);
@@ -322,9 +495,14 @@ export async function POST(req: Request) {
                     objective: String(nextStep.data?.objective || state.plan?.meta?.lesson_name || ''),
                     recentHistory: recent 
                   });
-                  nextMsg = explain.message || '';
-                  // Marcar como mostrado
-                  (shownMap as any)[stepKey] = true;
+                  // Blindaje: solo marcar como mostrado si hay contenido real
+                  if ((explain.message || '').trim()) {
+                    nextMsg = explain.message!;
+                    (shownMap as any)[stepKey] = true; // marca solo si hubo contenido
+                  } else {
+                    nextMsg = '';
+                    // NO marcar shownMap si está vacío
+                  }
                   
                   // Debug: confirmar que se ejecutó la narrativa
                   if (process.env.ENGINE_DEBUG === 'true') {
@@ -382,15 +560,17 @@ export async function POST(req: Request) {
           state.lastAnswerByAskCode![stepCode] = pendingInput;
           const noSeMap = state.noSeCountByAskCode || (state.noSeCountByAskCode = {});
           // Detección real de "no sé" / evasivas - MÁS PERMISIVO
-          const isNo = /^\s*(no\s*se|no\s*lo\s*se|no\s*sé|no\s*lo\s*sé|ns|n\/a|no|mmm|mm|ok|si|no\s*est[oó]\s*seguro)\s*$/i.test(pendingInput);
+          const isNo = /^\s*(no\s*(lo\s*)?s[eé]|no\s*est[oó]y?\s*seguro|no\s*s[eé]\s*bien)\s*$/i.test(pendingInput);
           if (isNo) {
             noSeMap[stepCode] = (noSeMap[stepCode] || 0) + 1;
+            // Si es "no sé", además de noSeCount, cuenta intento pedagógico
+            state.attemptsByAskCode[stepCode] = (state.attemptsByAskCode[stepCode] || 0) + 1;
           } else {
             state.attemptsByAskCode[stepCode] = (state.attemptsByAskCode[stepCode] || 0) + 1;
           }
           const attempts = state.attemptsByAskCode[stepCode] || 0;
           const vagueCfg = coursePolicies?.vague || {};
-          if (vague || cls.kind === 'PARTIAL' || cls.kind === 'HINT' || isNo || hybrid.reason === 'MAX_HINTS' || hybrid.reason === 'SEM_LOW') {
+          if (vague || cls.kind === 'PARTIAL' || cls.kind === 'HINT' || isNo || cls.reason === 'MAX_HINTS' || cls.reason === 'SEM_LOW') {
             // Política de reintentos por pregunta (loop control)
             const lastActionMap = state.lastActionByAskCode || (state.lastActionByAskCode = {});
             const hintsMap = state.hintsByAskCode || (state.hintsByAskCode = {} as any);
@@ -400,70 +580,139 @@ export async function POST(req: Request) {
             
             // Actualizar contadores
             if (cls.kind === 'HINT' || vague || isNo) {
-              if (lastAction === 'hint') hintsMap[stepCode] = currentHints + 1;
+              hintsMap[stepCode] = (currentHints || 0) + 1;   // <— SIEMPRE suma
               lastActionMap[stepCode] = 'hint';
             }
             
-            // Política de reintentos: 0→HINT_1, 1→HINT_2, ≥2→opciones o DEFAULT_ACCEPT
+            // Detectar si el estudiante está haciendo una pregunta
+            if (isStudentAskingQuestion(pendingInput)) {
+              // Ruta clarify: insertar micro-explicación del objetivo actual
+              try {
+                const recent = await getRecentHistory(sessionKey, 4);
+                const clarify = await runDocenteLLM({ 
+                  language: 'es', 
+                  action: 'explain', 
+                  stepType: 'ASK', 
+                  objective: String(act.step.data.objective || ''),
+                  contentBody: [String(act.step.data.objective || '')],
+                  recentHistory: recent 
+                });
+                message = clarify.message || '';
+                // Re-preguntar la ASK actual con reformulación
+                followUp = q;
+                state.justAskedFollowUp = Boolean(followUp);
+                dbg = { kind: 'CLARIFY', matched: [], missing: [], nextAction: 'clarify', stepCode };
+              } catch {
+                message = '';
+                followUp = q;
+                state.justAskedFollowUp = Boolean(followUp);
+              }
+              pendingInput = '';
+              break;
+            }
+            
+            // Política de reintentos: 0→HINT_1, 1→HINT_2, ≥2→opciones o transición pedagógica
             let fb = '';
             if (attempts < 2 && (cls.kind === 'HINT' || vague || isNo)) {
               // Mensaje alentador
               try {
                 const fbCfg: any = (coursePolicies as any)?.feedback || {};
                 const recent = await getRecentHistory(sessionKey, 4);
-                const deterministic = buildDeterministicFeedback();
+                const deterministic = mkFb(
+                  { kind: cls.kind, matched: cls.matched, missing: cls.missing },
+                  { attempts, hintsUsed, coursePolicies }
+                );
                 const llmFb = await runDocenteLLM({ language: 'es', action: 'feedback', stepType: 'ASK', questionText: q, userAnswer: pendingInput, matched: cls.matched, missing: cls.missing, objective: String(act.step.data.objective || ''), contentBody: expected, hintWordLimit: Number(fbCfg.maxSentences ?? 3), allowQuestions: fbCfg.allowQuestions !== false, kind: cls.kind as any, recentHistory: recent });
-                fb = [deterministic, llmFb.message || ''].filter(Boolean).join('\n\n');
-              } catch {}
-              const pool = (cls.missing && cls.missing.length ? cls.missing : expected).filter(Boolean).map(String);
-              try {
-                const wordLimits = coursePolicies?.hints?.wordLimits || [18,35,60];
-                const limit = wordLimits[0] ?? 18;
-                // Hints con keywords del curso (objetivos + contenido del momento)
-                const moment = state.plan?.moments?.[act.step.momentIndex];
-                const objText = String(state.plan?.meta?.lesson_name || act.step.data.objective || '');
-                const priorTexts: string[] = [];
-                for (const ps of (moment?.steps || []).slice(0, act.step.stepIndex)) {
-                  const d: any = ps.data;
-                  if (Array.isArray(d?.body)) priorTexts.push(...d.body.map((x:any)=>String(x)));
-                  if (Array.isArray(d?.items)) priorTexts.push(...d.items.map((x:any)=>String(x)));
-                  if (d?.text) priorTexts.push(String(d.text));
-                  if (d?.title) priorTexts.push(String(d.title));
+                
+                // Siempre priorizar LLM, solo usar determinista como último recurso
+                const showDeterministic = fbCfg.showDeterministic !== false; // default: true
+                const llmHasContent = llmFb.message && llmFb.message.trim().length > 30;
+                
+                // Solo usar determinista si:
+                // 1. Está habilitado
+                // 2. El LLM no proporcionó contenido
+                if (showDeterministic && !llmHasContent) {
+                  fb = deterministic || '';
+                } else {
+                  fb = llmFb.message || '';  // Siempre priorizar LLM
                 }
-                const expectedPlus = extractKeywords([objText, ...priorTexts]);
-                // Variación de hint (pool configurable)
-                const variants = Array.isArray(coursePolicies?.hints?.variants) ? coursePolicies?.hints?.variants as string[] : [];
-                const vIdx = (hintsMap[stepCode] || 0) % Math.max(1, variants.length || 1);
-                const variantCue = variants.length ? variants[vIdx] : '';
-                const recent = await getRecentHistory(sessionKey, 4);
-                const llm = await runDocenteLLM({ language: 'es', action: 'hint', stepType: 'ASK', questionText: q, userAnswer: pendingInput, matched: cls.matched, missing: cls.missing, objective: String(act.step.data.objective || ''), contentBody: variantCue ? [variantCue, ...expectedPlus] : expectedPlus, hintWordLimit: limit, recentHistory: recent });
-                message = [fb, llm.message].filter(Boolean).join('\n\n');
-                followUp = llm.followUp || '';
-              } catch { message = ''; followUp = ''; }
-              // Incrementar hints usados cada vez que emitimos un hint
-              hintsMap[stepCode] = (hintsMap[stepCode] || 0) + 1;
+              } catch {}
+              // HINT: objetivo-primero (sustituye el bloque actual de hint)
+              {
+                const wordLimits = coursePolicies?.hints?.wordLimits || [18,35,60];
+                const variants = Array.isArray(coursePolicies?.hints?.variants) ? coursePolicies.hints.variants : [];
+                const limit = wordLimits[0] ?? 18;
+
+                const objText = String(act.step.data.objective || state.plan?.meta?.lesson_name || '');
+                const expectedArr = Array.isArray(expected) ? expected : [];
+                const missingArr = Array.isArray(cls.missing) ? cls.missing : [];
+
+                const hintMsg = makeObjectiveHint({
+                  objective: objText,
+                  expected: expectedArr,
+                  missing: missingArr,
+                  variants,
+                  wordLimit: limit
+                });
+
+                // Mensaje al alumno: feedback determinista breve + pista objetivo-primero
+                const deterministic = mkFb({ kind: cls.kind, matched: cls.matched, missing: cls.missing }, { attempts, hintsUsed: currentHints, coursePolicies });
+                message = [deterministic, hintMsg].filter(Boolean).join('\n\n');
+
+                // Repregunta corta — objetivo-primero, 10 palabras aprox
+                const reask = makeObjectiveReask({
+                  questionText: q,
+                  objective: objText,
+                  expected: expectedArr,
+                  answerType: (act.step.data as any)?.answer_type || 'list',
+                  maxWords: Number(coursePolicies?.vague?.simplifiedAskMaxWords ?? 10)
+                });
+
+                followUp = reask;
+                state.justAskedFollowUp = true;            // ← CLAVE para continuidad
+                state.lastFollowUpText = followUp;
+                hintsMap[stepCode] = (hintsMap[stepCode] || 0) + 1;   // solo si emitimos hint
+              }
               dbg = { kind: cls.kind, matched: cls.matched?.slice(0,3) || [], missing: cls.missing?.slice(0,3) || [], nextAction: 'hint', stepCode };
               pendingInput = '';
               break;
             }
-            // DEFAULT_ACCEPT: 3º intento vago o REFOCUS → avanzar a la siguiente ASK (sin opciones)
+            // Transición pedagógica: usar decideNextAction en lugar de DEFAULT_ACCEPT agresivo
             {
-              const nextAskIdx = getNextAskInSameCycle(state, state.stepIdx);
-              if (typeof nextAskIdx === 'number') {
-                state = advanceTo(state, nextAskIdx);
-                followUp = (currentStep(state) as any)?.data?.question || '';
-                state.justAskedFollowUp = Boolean(followUp);
+              const momentKind = state.plan?.moments?.[act.step.momentIndex]?.code || '';
+              const lastAction = state.lastActionByAskCode?.[stepCode] || '';
+              const noSeCount = state.noSeCountByAskCode?.[stepCode] || 0;
+              
+              const nextAction = decideNextAction({
+                lastAction,
+                noSeCount,
+                attempts,
+                momentKind
+              });
+              
+              if (nextAction === 'force_advance') {
+                // Solo avance forzado en SALUDO/CONEXIÓN
+                const nextAskIdx = getNextAskInSameCycle(state, state.stepIdx);
+                if (typeof nextAskIdx === 'number') {
+                  state = advanceTo(state, nextAskIdx);
+                  followUp = (currentStep(state) as any)?.data?.question || '';
+                  state.justAskedFollowUp = Boolean(followUp);
+                }
+                // Mensaje de cierre suave
+                try {
+                  const recent = await getRecentHistory(sessionKey, 4);
+                  const bridge = await runDocenteLLM({ language: 'es', action: 'advance', stepType: 'ASK', objective: String(act.step.data.objective || ''), recentHistory: recent });
+                  message = [fb, bridge.message].filter(Boolean).join('\n\n');
+                } catch {}
+                dbg = { kind: cls.kind, matched: cls.matched?.slice(0,3) || [], missing: cls.missing?.slice(0,3) || [], nextAction: 'force_advance', stepCode };
+              } else {
+                // Transición pedagógica: reask, hint, explain, options
+                dbg = { kind: cls.kind, matched: cls.matched?.slice(0,3) || [], missing: cls.missing?.slice(0,3) || [], nextAction, stepCode };
+                // El siguiente turno manejará la acción específica
               }
+              pendingInput = '';
+              break;
             }
-            // Mensaje de cierre suave
-            try {
-              const recent = await getRecentHistory(sessionKey, 4);
-              const bridge = await runDocenteLLM({ language: 'es', action: 'advance', stepType: 'ASK', objective: String(act.step.data.objective || ''), recentHistory: recent });
-              message = [fb, bridge.message].filter(Boolean).join('\n\n');
-            } catch {}
-            dbg = { kind: cls.kind, matched: cls.matched?.slice(0,3) || [], missing: cls.missing?.slice(0,3) || [], nextAction: 'advance', stepCode };
-            pendingInput = '';
-            break;
           }
 			}
 			if (act.kind === 'end') {
@@ -535,14 +784,26 @@ export async function POST(req: Request) {
 					followUpChars: (followUp || '').length,
 					hasFollowUp: Boolean(followUp && String(followUp).trim()),
 					userInputLen: (pendingInput || '').length,
-					thresholds: { jaccardMin: 0.25, semThresh: 0.52, semBest: 0.42 },
+					thresholds: { jaccardMin: 0.25, semThresh: 0.48, semBest: 0.40 },
 					hintsUsed: Number(state.hintsByAskCode?.[(st as any)?.code || dbg?.stepCode] || 0)
 				};
 				// eslint-disable-next-line no-console
 				console.debug(JSON.stringify(payload));
 			}
 		} catch {}
-		return NextResponse.json({ message, followUp, state: { stepIdx: state.stepIdx, done: state.done } });
+		// Obtener métricas de presupuesto si está disponible
+		const budgetMetrics = state.budgetCentsLeft !== undefined ? {
+			budgetCentsLeft: state.budgetCentsLeft,
+			escalationsUsed: state.escalationsUsed || 0,
+			adaptiveMode: state.adaptiveMode || false
+		} : null;
+
+		return NextResponse.json({ 
+			message, 
+			followUp, 
+			state: { stepIdx: state.stepIdx, done: state.done },
+			budgetMetrics 
+		});
 	} catch (err: any) {
 		return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
 	}

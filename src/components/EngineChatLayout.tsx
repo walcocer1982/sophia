@@ -140,7 +140,7 @@ export default function EngineChatLayout({
                   <div>
                     <h4 className="text-xs font-medium text-slate-700 mb-2">Momentos</h4>
                     <div className="space-y-2">
-                      {vm.moments.map((m, i) => (
+                      {vm.moments.map((m: any, i: number) => (
                         <div key={`${m.title}-${i}`} className={`flex items-center gap-2 text-xs ${i === state.momentIdx ? 'text-blue-700' : 'text-slate-500'}`}>
                           <span className={`w-2 h-2 rounded-full ${i === state.momentIdx ? 'bg-blue-600' : 'bg-slate-300'}`} />
                           <span className="truncate">{m.title}</span>
@@ -152,7 +152,7 @@ export default function EngineChatLayout({
                     <div>
                       <h4 className="text-xs font-medium text-slate-700 mb-2">Puntos Clave</h4>
                       <div className="space-y-2">
-                        {vm.keyPoints.map(kp => (
+                        {vm.keyPoints.map((kp: any) => (
                           <div key={kp.id} className={`p-3 rounded-lg border ${kp.completed ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-200'}`}>
                             <div className="text-xs font-medium text-slate-800">{kp.title}</div>
                             {kp.description && <div className="text-[11px] text-slate-600 mt-1">{kp.description}</div>}
