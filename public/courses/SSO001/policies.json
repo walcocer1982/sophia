@@ -12,12 +12,36 @@
     "reflexiva": { "min": 1 }
   },
   "hints": {
-    "wordLimits": [18, 35, 60],
-    "escalateAfterAttempts": [1, 2, 3],
+    "mentionCount": 2,
+    "wordLimits": [16, 22, 28],
+    "maxHints": 2,
     "variants": [
-      "Piensa en los criterios del EPP",
-      "Recuerda los riesgos antes de actuar"
-    ]
+      "Piensa en los puntos clave.",
+      "Evita generalidades y baja a concreto.",
+      "Conecta con el objetivo de la pregunta."
+    ],
+    "templates": {
+      "objective": "{opener} Enfócate en {keywords}. {cueLine}",
+      "reask": {
+        "list": "Menciona en {maxWords} palabras 2 elementos de {base}.",
+        "definition": "Define en {maxWords} palabras {base}.",
+        "procedure": "Enumera en {maxWords} palabras 2 pasos clave de {base}.",
+        "choice": "Indica en {maxWords} palabras la opción que aplica sobre {base}."
+      },
+      "open": {
+        "hint": "Comparte tus ideas en al menos {minWords} palabras. {cuesLine} Conecta con tu experiencia.",
+        "reask": "En {minWords}-{maxWords} palabras, cuéntame {aspects} sobre \"{objective}\".",
+        "fallbackAspects": [
+          "objetivo",
+          "alcance",
+          "responsables",
+          "recursos",
+          "pasos",
+          "criterios"
+        ],
+        "aspectsLabel": "tus ideas principales"
+      }
+    }
   },
 
   "feedback": {
@@ -38,10 +62,10 @@
     "maxAttemptsBeforeForce": 2
   },
   "vague": {
-    "minUsefulTokens": 3,
-    "maxStopwordRatio": 0.6,
-    "echoOverlap": 0.7,
-    "repeatSimilarity": 0.8,
+    "minUsefulTokens": 2,
+    "maxStopwordRatio": 0.7,
+    "echoOverlap": 0.8,
+    "repeatSimilarity": 0.85,
     "vagueAttemptsBeforeAB": 2,
     "vagueAttemptsBeforeExplain": 3,
     "simplifiedAskMaxWords": 10
