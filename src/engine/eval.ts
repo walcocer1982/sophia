@@ -216,6 +216,7 @@ export type HybridOpts = {
   semThresh?: number;
   semBestThresh?: number;
   maxHints?: number;
+  vague?: { stopwords?: string[]; minUsefulTokens?: number; maxStopwordRatio?: number; echoOverlap?: number; repeatSimilarity?: number };
 };
 
 export async function evaluateHybrid(
@@ -250,7 +251,14 @@ export async function evaluateHybrid(
   if (isNoSe(user)) return { kind: 'HINT', reason: 'DONT_KNOW', matched: [], missing: acceptable.slice(0,3) };
 
   // 1) Gate de vaguedad (barato) - MÁS PERMISIVO
-  const vague = isVagueAnswer(u, undefined, { minUsefulTokens: 2, echoOverlap: 0.8, lastAnswer: context?.lastAnswer });
+  const vague = isVagueAnswer(u, undefined, { 
+    stopwords: opts.vague?.stopwords,
+    minUsefulTokens: opts.vague?.minUsefulTokens ?? 2,
+    maxStopwordRatio: opts.vague?.maxStopwordRatio ?? 0.6,
+    echoOverlap: opts.vague?.echoOverlap ?? 0.8,
+    repeatSimilarity: opts.vague?.repeatSimilarity ?? 0.8,
+    lastAnswer: context?.lastAnswer 
+  });
   if (vague) return { kind: 'HINT', reason: 'VAGUE', matched: [], missing: acceptable.slice(0,3) };
   
   // 2) Detección de "eco" (repetición de pregunta/respuesta anterior) - MÁS PERMISIVO

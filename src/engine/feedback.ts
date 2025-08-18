@@ -28,11 +28,8 @@ export function buildDeterministicFeedback(
   const openers: string[] = (opts.coursePolicies?.feedback?.openers?.hint || []) as string[];
   const idx = (opts.hintsUsed % Math.max(1, openers.length || 1)); // <— ROTA DE VERDAD
   const opener = openers[idx] || 'Intenta precisar un poco más.';
-
-  // 3) Reducir "Menciona…" a DOS elementos para no sonar robótico
-  if (has(cls.missing)) {
-    const top = cls.missing!.slice(0, 2);
-    return `${opener} Menciona: ${top.join(', ')}.`;
-  }
-  return `${opener} Da un ejemplo o una idea concreta.`;
+  
+  // 3) En HINT/REFOCUS devolver solo el opener.
+  // La pista concreta se compone en hints.ts y se integra en route.ts
+  return opener;
 }
