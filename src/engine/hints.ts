@@ -53,10 +53,12 @@ export function makeHintMessage(opts: {
   hintsUsed: number;
   attempts: number;
   coursePolicies?: { hints?: HintPolicies; language?: LangPolicies; feedback?: any };
+  teacherProfile?: any;
 }) {
-  const { questionText, objective, expected, missing, answerType = 'list', hintsUsed, attempts, coursePolicies } = opts;
-  const hp = coursePolicies?.hints || {};
-  const lp = coursePolicies?.language || {};
+  const { questionText, objective, expected, missing, answerType = 'list', hintsUsed, attempts } = opts as any;
+  const policy = (opts as any).teacherProfile || (opts as any).coursePolicies || {};
+  const hp = policy?.hints || {};
+  const lp = policy?.language || policy?.lang || {};
   const wordLimits = hp.wordLimits || [16, 22, 28];
   const mentionCount = hp.mentionCount ?? 2;
   const sev = severity(attempts, hintsUsed);
@@ -99,9 +101,11 @@ export function makeReaskMessage(opts: {
   expected: string[];
   answerType?: 'open'|'list'|'definition'|'procedure'|'choice';
   coursePolicies?: { hints?: HintPolicies };
+  teacherProfile?: any;
 }) {
-  const { questionText, objective, expected, answerType = 'list', coursePolicies } = opts;
-  const hp = coursePolicies?.hints || {};
+  const { questionText, objective, expected, answerType = 'list' } = opts as any;
+  const policy = (opts as any).teacherProfile || (opts as any).coursePolicies || {};
+  const hp = policy?.hints || {};
   const baseStr = buildStudentFacingBase(questionText, objective, expected);
   if (answerType === 'open') {
     const tmpl = hp.templates?.open?.reask || 'En {minWords}-{maxWords} palabras, cuéntame {aspects} sobre "{objective}".';

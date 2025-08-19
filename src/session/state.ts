@@ -10,6 +10,7 @@ export type SessionState = {
 	lastAnswerByAskCode?: Record<string, string>;
 	noSeCountByAskCode?: Record<string, number>;
 	lastActionByAskCode?: Record<string, string>;
+	teacherProfile?: any;
 	justAskedFollowUp?: boolean;
 	// Anti-repetición de narrativa por momento
 	narrativesShownByMoment?: Record<number, boolean>;
@@ -19,6 +20,8 @@ export type SessionState = {
 	shownByMomentIndex?: Record<number, boolean>;
 	askedAskCodes: string[];
 	answeredAskCodes: string[];
+	partiallyAnsweredAskCodes?: string[];
+	pendingRemediation?: Record<string, string[]>;
 	done: boolean;
 	// Nuevos campos para adaptación y presupuesto
 	dynamicQueue: Array<{

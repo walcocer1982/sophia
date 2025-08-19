@@ -328,3 +328,91 @@ export async function evaluateHybrid(
   
   return { kind: 'HINT', reason: 'SEM_LOW', matched: [], missing: acceptable.slice(0,3), sem: { cos, best } };
 }
+
+// Evaluación SOLO semántica (sin gates rápidos ni heurísticas de vaguedad)
+export type SemanticOpts = { semThresh?: number; semBestThresh?: number; maxHints?: number; vagueCenter?: { corpus?: string[]; tauVagueMin?: number; delta?: number; tauObj?: number } };
+
+export async function evaluateSemanticOnly(
+  user: string,
+  acceptable: string[] = [],
+  expected: string[] = [],
+  policy: AskPolicy = { type: 'conceptual' },
+  opts: SemanticOpts = { semThresh: 0.50, semBestThresh: 0.40, maxHints: 2 },
+  context?: { hintsUsed?: number }
+): Promise<{ kind: 'ACCEPT'|'PARTIAL'|'HINT'|'REFOCUS'; reason: string; matched: string[]; missing: string[]; sem?: { cos: number; best?: { text: string; cos: number } } }> {
+  const u = normalize(user);
+  if (!u) return { kind: 'HINT', reason: 'EMPTY', matched: [], missing: acceptable.slice(0,3) };
+
+  // Umbrales por tipo (solo semánticos)
+  const t = normalize(String(policy.type || ''));
+  const getThresholds = () => {
+    switch (t) {
+      case 'diagnostica': return { semThresh: opts.semThresh ?? 0.40, semBestThresh: opts.semBestThresh ?? 0.30 };
+      case 'conceptual':  return { semThresh: opts.semThresh ?? 0.44, semBestThresh: opts.semBestThresh ?? 0.34 };
+      case 'aplicacion':  return { semThresh: opts.semThresh ?? 0.42, semBestThresh: opts.semBestThresh ?? 0.32 };
+      case 'listado':     return { semThresh: opts.semThresh ?? 0.42, semBestThresh: opts.semBestThresh ?? 0.32 };
+      default:            return { semThresh: opts.semThresh ?? 0.44, semBestThresh: opts.semBestThresh ?? 0.34 };
+    }
+  };
+  const { semThresh, semBestThresh } = getThresholds();
+
+  // Índice + score semántico (objetivo)
+  let idx: AskVectorIndex | null = null;
+  try { idx = await buildAskIndex(acceptable, expected); } catch { idx = null; }
+  if (!idx || !idx.centroid?.length) return { kind: 'HINT', reason: 'NO_SEM_MODEL', matched: [], missing: acceptable.slice(0,3) };
+  const { cos, best } = await semanticScore(u, idx);
+
+  // Centro vago por embeddings (opcional y configurable)
+  if (opts?.vagueCenter?.corpus && Array.isArray(opts.vagueCenter.corpus) && opts.vagueCenter.corpus.length > 0) {
+    try {
+      const idxV = await buildAskIndex(opts.vagueCenter.corpus as any, []);
+      const { cos: cosVague } = await semanticScore(u, idxV);
+      const tauV = typeof opts.vagueCenter.tauVagueMin === 'number' ? opts.vagueCenter.tauVagueMin : 0.60;
+      const delta = typeof opts.vagueCenter.delta === 'number' ? opts.vagueCenter.delta : 0.05;
+      const tauObj = typeof opts.vagueCenter.tauObj === 'number' ? opts.vagueCenter.tauObj : semThresh;
+      const emptyByCenter = (cosVague >= (cos + delta)) || ((cos < tauObj) && (cosVague >= tauV));
+      if (emptyByCenter) {
+        return { kind: 'HINT', reason: 'EMPTY_CENTER', matched: [], missing: acceptable.slice(0,3), sem: { cos, best } } as any;
+      }
+    } catch {}
+  }
+
+  // Decisión SOLO por embeddings
+  if (cos >= semThresh) {
+    if (t === 'aplicacion') {
+      const justifica = /porque|para|ya que/i.test(user);
+      return {
+        kind: (justifica ? 'ACCEPT' : 'PARTIAL'),
+        reason: (justifica ? 'SEM_APLICACION_OK' : 'SEM_FALTA_JUSTIFICACION'),
+        matched: best?.text ? [best.text] : [],
+        missing: [],
+        sem: { cos, best }
+      } as any;
+    }
+    return {
+      kind: 'PARTIAL',
+      reason: 'SEM_SIMILAR',
+      matched: best?.text ? [best.text] : [],
+      missing: acceptable.filter(a => a !== best?.text).slice(0,2),
+      sem: { cos, best }
+    };
+  }
+
+  if ((best?.cos || 0) >= semBestThresh) {
+    return {
+      kind: 'PARTIAL',
+      reason: 'SEM_BEST',
+      matched: best?.text ? [best.text] : [],
+      missing: acceptable.filter(a => a !== best?.text).slice(0,2),
+      sem: { cos, best }
+    };
+  }
+
+  // Sin suficiente similitud → pista o refocus determinista
+  const hintsUsed = context?.hintsUsed || 0;
+  if (hintsUsed >= (opts.maxHints ?? 2)) {
+    return { kind: 'REFOCUS', reason: 'MAX_HINTS', matched: [], missing: acceptable.slice(0,3), sem: { cos, best } } as any;
+  }
+
+  return { kind: 'HINT', reason: 'SEM_LOW', matched: [], missing: acceptable.slice(0,3), sem: { cos, best } } as any;
+}
