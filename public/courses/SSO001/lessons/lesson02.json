@@ -43,7 +43,10 @@
           "expected": ["arnés", "línea de vida", "casco", "guantes", "inspección previa", "supervisión"],
           "acceptable_answers": ["arnés", "arnés de seguridad", "línea", "línea de vida", "casco", "guantes", "inspección previa", "supervisión"],
           "question_type": "diagnóstica"
+          
         },
+
+
         { "code": "M2-Q02", "order": 3, "type": "ASK",
           "question": "¿Qué podría pasar si no se siguen los procedimientos correctos?",
           "objective": "Conciencia de riesgos",
