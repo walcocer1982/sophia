@@ -13,6 +13,7 @@ import fs from 'fs/promises';
 import { NextResponse } from 'next/server';
 import path from 'path';
 
+
 type ClientState = {
   momentIdx?: number;
   stepIdx?: number;
@@ -150,6 +151,14 @@ export async function POST(req: Request) {
 		let message = '';
 		let followUp = '';
 		let displayValue: string | undefined;
+		// Variables para rúbrica/evaluación
+		let assessment: any = null;
+		let lastClsKind: 'ACCEPT'|'PARTIAL'|'HINT'|'REFOCUS'|null = null;
+		let lastMatched: string[] = [];
+		let lastMissing: string[] = [];
+		let lastAttempts = 0;
+		let lastHints = 0;
+		let lastStepCodeForAssess = '';
 		
 		// --- REEMITIR REPREGUNTA SI AÚN NO RESPONDE (continuidad) ---
 		if (!pendingInput.trim() && state.justAskedFollowUp && state.lastFollowUpText) {
@@ -161,7 +170,7 @@ export async function POST(req: Request) {
 		}
 		
 		// 1) Si el alumno pide "permiso" para preguntar (detección semántica de intención)
-		if ((await isStudentAskingQuestionSem(pendingInput, (state as any).teacherProfile)) && !/\w+\?/.test(pendingInput)) {
+		if ((await isStudentAskingQuestionSem(pendingInput, (state as any).teacherProfile)) && /\w+\?/.test(pendingInput) === false) {
 			message = '¡Claro! Dime cuál es tu consulta y, cuando quede claro, me lo confirmas para continuar con la clase.';
 			// "pausa": recuerda dónde estás para retomar
 			state.consultCtx.pausedAt = { momentIndex: state.momentIdx!, stepIndex: state.stepIdx! };
@@ -328,10 +337,10 @@ export async function POST(req: Request) {
             try {
               const recent = await getRecentHistory(sessionKey, 4);
               const llm = await runDocenteLLM({ language: 'es', action: 'ask', stepType: 'ASK', questionText: q, objective: String(act.step.data.objective || ''), recentHistory: recent });
-						message = llm.message;
-					} catch { message = q; }
-					break;
-				}
+					message = llm.message;
+				} catch { message = q; }
+				break;
+			}
           // Evaluación para preguntas abiertas (answer_type: "open")
           const answerType = (act.step.data as any)?.answer_type || '';
           const rubric = (act.step.data as any)?.rubric || {};
@@ -361,6 +370,13 @@ export async function POST(req: Request) {
             );
             cls = { kind: sem.kind, matched: sem.matched, missing: sem.missing, sem: sem.sem };
             vague = false;
+            // Capturar evaluación para rúbrica
+            lastClsKind = cls.kind as any;
+            lastMatched = Array.isArray(cls.matched) ? cls.matched : [];
+            lastMissing = Array.isArray(cls.missing) ? cls.missing : [];
+            lastAttempts = attempts;
+            lastHints = hintsUsed;
+            lastStepCodeForAssess = stepCode;
           }
           
           // Endurecer aceptación en SALUDO/CONEXIÓN (evitar falsos ACCEPT)
@@ -381,7 +397,7 @@ export async function POST(req: Request) {
             try {
               // Registrar pendientes y marcar como parcialmente respondida
               const faltos = Array.isArray(cls.missing) ? cls.missing.slice(0, 3) : [];
-              (state as any).partiallyAnsweredAskCodes = Array.from(new Set([...
+              (state as any).partiallyAnsweredAskCodes = Array.from(new Set([
                 (((state as any).partiallyAnsweredAskCodes || []) as string[]), stepCode
               ]));
               (state as any).pendingRemediation = (state as any).pendingRemediation || {};
@@ -794,25 +810,6 @@ export async function POST(req: Request) {
                 // Actualizar última acción
                 lastActionMap[stepCode] = 'hint';
                 dbg = { kind: cls.kind, matched: cls.matched?.slice(0,3) || [], missing: cls.missing?.slice(0,3) || [], nextAction: 'hint', stepCode };
-              } else if (nextAction === 'explain') {
-                // Micro‑explicación del objetivo actual
-                try {
-                  const recent = await getRecentHistory(sessionKey, 4);
-                  const explain = await runDocenteLLM({
-                    language: 'es',
-                    action: 'explain',
-                    stepType: 'ASK',
-                    objective: String(act.step.data.objective || ''),
-                    contentBody: expected,
-                    recentHistory: recent
-                  });
-                  message = explain.message || '';
-                } catch { message = ''; }
-                followUp = q;
-                state.justAskedFollowUp = Boolean(followUp);
-                // Actualizar última acción
-                lastActionMap[stepCode] = 'explain';
-                dbg = { kind: cls.kind, matched: cls.matched?.slice(0,3) || [], missing: cls.missing?.slice(0,3) || [], nextAction: 'explain', stepCode };
               } else {
                 // Transición pedagógica por defecto
                 dbg = { kind: cls.kind, matched: cls.matched?.slice(0,3) || [], missing: cls.missing?.slice(0,3) || [], nextAction, stepCode };
@@ -833,6 +830,28 @@ export async function POST(req: Request) {
 				break;
 			}
 		}
+		// Componer assessment (rúbrica) si hubo una evaluación reciente
+		try {
+			if (lastClsKind) {
+				const ev: any = (coursePolicies as any)?.evaluation || {};
+				const scoring: Record<string, number> = ev.scoring || { R2: 2, R1: 1, R0: 0 };
+				const level = lastClsKind === 'ACCEPT' ? 'R2' : (lastClsKind === 'PARTIAL' ? 'R1' : 'R0');
+				const levelNum = level === 'R2' ? 2 : (level === 'R1' ? 1 : 0);
+				const aids = Math.max(0, lastHints);
+				const aidTag = aids > 0 ? `${levelNum}${'A'.repeat(Math.min(aids, 2))}` : undefined;
+				assessment = {
+					level,
+					score: typeof scoring[level] === 'number' ? scoring[level] : levelNum,
+					tags: aidTag ? [aidTag] : [],
+					matched: lastMatched,
+					missing: lastMissing,
+					attempt: lastAttempts,
+					hintsUsed: lastHints,
+					stepCode: lastStepCodeForAssess
+				};
+			}
+		} catch {}
+		
 		// Garantía final: siempre devolver un mensaje del docente usando datos del plan
 		if (!skipGuarantee && (!message || !String(message).trim()) && (!followUp || !String(followUp).trim())) {
 			try {
@@ -908,6 +927,7 @@ export async function POST(req: Request) {
 		return NextResponse.json({ 
 			message, 
 			followUp, 
+			assessment,
 			state: { stepIdx: state.stepIdx, done: state.done },
 			budgetMetrics 
 		});

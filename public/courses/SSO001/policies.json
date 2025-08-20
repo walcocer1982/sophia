@@ -2,6 +2,21 @@
   "language": {
     "stopwords": ["el","la","los","las","un","una","unos","unas","de","en","y","o","a","para","con","sobre","que","es","son","del","al","por","se","como","mas","más","menos","no","si","sí","qué","cuales","cuáles"]
   },
+  "evaluation": {
+    "attemptsMax": 3,
+    "levels": {
+      "R0": { "description": "vacío/vago/fuera de tema" },
+      "R1": { "description": "parcial" },
+      "R2": { "description": "correcta" }
+    },
+    "thresholds": {
+      "similarityMin": 0.50,
+      "similarityBest": 0.62,
+      "keywordMin": 1,
+      "minTokens": 3
+    },
+    "scoring": { "R2": 2, "R1": 1, "R0": 0 }
+  },
   "thresholds": {
     "conceptual": { "min": 1 },
     "identificacion": { "min": 1 },
@@ -13,11 +28,27 @@
   },
   "hints": {
     "wordLimits": [18, 35, 60],
+    "maxHints": 2,
     "escalateAfterAttempts": [1, 2, 3],
     "variants": [
       "Piensa en los criterios del EPP",
       "Recuerda los riesgos antes de actuar"
-    ]
+    ],
+    "rotateVariants": true,
+    "templates": {
+      "objective": "{opener} Enfócate en {keywords}. {cueLine}",
+      "reask": {
+        "list": "Menciona en {maxWords} palabras 2 elementos de {base}.",
+        "definition": "Define brevemente {base} (≤{maxWords} palabras).",
+        "procedure": "En {maxWords} palabras, describe 2 pasos clave de {base}.",
+        "choice": "Elige 1 aspecto de {base} y justifica en {maxWords} palabras."
+      },
+      "open": {
+        "hint": "Comparte tus ideas en al menos {minWords} palabras. {cuesLine}",
+        "reask": "En {minWords}-{maxWords} palabras, cuéntame tus ideas principales sobre \"{objective}\".",
+        "fallbackAspects": ["propósito", "criterios", "ejemplo"]
+      }
+    }
   },
 
   "feedback": {
