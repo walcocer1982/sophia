@@ -3,6 +3,7 @@
 type LessonVM = any;
 type EngineState = any;
 import { Clock, Menu, Send, User, X } from 'lucide-react';
+import Image from 'next/image';
 import React, { useEffect, useRef, useState } from 'react';
 import VoiceRecorder from './VoiceRecorder';
 
@@ -24,6 +25,7 @@ export default function EngineChatLayout({
   const [inputValue, setInputValue] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isTyping]);
 
@@ -56,16 +58,91 @@ export default function EngineChatLayout({
       </header>
 
       <div className="flex h-[calc(100vh-72px)]">
-        {/* Main chat (más ancho que multimedia) */}
+        {/* Left side: Panel informativo (Aprendizaje esperado, Puntos clave y Progreso) */}
+        <div className={`hidden lg:block transition-all duration-300 pl-3 ${sidebarOpen ? 'lg:basis-[15%] xl:basis-[15%] opacity-100' : 'lg:basis-0 opacity-0 pointer-events-none'}`}>
+          <div className={`h-full m-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col bg-white transition-all duration-300 ${sidebarOpen ? 'scale-100' : 'scale-95'}`}>
+            <div className="px-6 py-4 border-b border-slate-200">
+              <h3 className="font-semibold text-slate-900">Resumen de la sesión</h3>
+            </div>
+            <div className="p-6 space-y-4 overflow-y-auto">
+              {vm && state && (
+                <>
+                  {Array.isArray(vm.expectedLearning) && vm.expectedLearning.length > 0 && (
+                    <div>
+                      <h4 className="text-xs font-medium text-slate-700 mb-2">Aprendizaje esperado</h4>
+                      <ul className="list-disc ml-4 space-y-1">
+                        {vm.expectedLearning.map((it: string, i: number) => (
+                          <li key={`el-${i}`} className="text-xs text-slate-700">{it}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <div>
+                    {vm.keyPoints && vm.keyPoints.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-medium text-slate-700 mb-2">Puntos Clave</h4>
+                        <div className="space-y-2">
+                          {vm.keyPoints.map((kp: any) => (
+                            <div key={kp.id} className={`p-3 rounded-lg border ${kp.completed ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-200'}`}>
+                              <div className="text-xs font-medium text-slate-800">{kp.title}</div>
+                              {kp.description && <div className="text-[11px] text-slate-600 mt-1">{kp.description}</div>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="pt-2 border-t border-slate-200">
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-slate-600">Momento</span>
+                      <span className="font-medium text-slate-900">{vm.moments.length > 0 ? Math.min(state.momentIdx + 1, vm.moments.length) : 0}/{vm.moments.length}</span>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-2">
+                      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 h-2 rounded-full transition-all" style={{ width: `${Math.round(((vm.moments.length > 0 ? Math.min(state.momentIdx + 1, vm.moments.length) : 0) / Math.max(1, vm.moments.length)) * 100)}%` }} />
+                    </div>
+                    <div className="mt-3">
+                      <h4 className="text-xs font-medium text-slate-700 mb-2">Momentos</h4>
+                      <div className="space-y-2">
+                        {vm.moments.map((m: any, i: number) => (
+                          <div key={`${m.title}-${i}`} className={`flex items-center gap-2 text-xs ${i === state.momentIdx ? 'text-blue-700' : 'text-slate-500'}`}>
+                            <span className={`w-2 h-2 rounded-full ${i === state.momentIdx ? 'bg-blue-600' : 'bg-slate-300'}`} />
+                            <span className="truncate">{m.title}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Main chat (centro, más ancho que multimedia) */}
         <div className={`transition-all duration-300 w-full ${sidebarOpen ? 'lg:basis-[60%] xl:basis-[65%]' : 'lg:basis-[70%] xl:basis-[75%]'}`}>
           <div className="h-full bg-white m-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {messages.map((m) => (
                 <div key={m.id} className={`flex items-start space-x-4 ${m.sender === 'student' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold shadow-md ${m.sender === 'ai' ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white' : 'bg-gradient-to-br from-slate-600 to-slate-700 text-white'}`}>
-                    {m.sender === 'ai' ? 'AI' : <User className="w-5 h-5" />}
-                  </div>
+                  {m.sender === 'ai' ? (
+                    <button
+                      type="button"
+                      className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-blue-500 shadow-md bg-white flex items-center justify-center cursor-pointer"
+                      onClick={() => vm?.avatarUrl && setPreviewSrc(vm.avatarUrl)}
+                      aria-label="Ver foto de la instructora"
+                    >
+                      {vm?.avatarUrl ? (
+                        <Image src={vm.avatarUrl} alt="Instructora" width={40} height={40} className="object-cover w-10 h-10" />
+                      ) : (
+                        <div className="w-10 h-10 flex items-center justify-center text-sm font-semibold bg-gradient-to-br from-blue-600 to-indigo-600 text-white">AI</div>
+                      )}
+                    </button>
+                  ) : (
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold shadow-md bg-gradient-to-br from-slate-600 to-slate-700 text-white">
+                      <User className="w-5 h-5" />
+                    </div>
+                  )}
                   <div className={`flex-1 max-w-[85%] ${m.sender === 'student' ? 'text-right' : ''}`}>
                     <div className={`inline-block px-5 py-3 rounded-2xl shadow-sm ${m.sender === 'student' ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white' : 'bg-white border border-slate-200 text-slate-900'}`}>
                       <p className="text-sm leading-relaxed whitespace-pre-wrap">{m.content}</p>
@@ -78,7 +155,26 @@ export default function EngineChatLayout({
                 </div>
               ))}
               {isTyping && (
-                <div className="text-xs text-slate-500">Docente escribiendo…</div>
+                <div className="flex items-start space-x-4">
+                  <button
+                    type="button"
+                    className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-blue-500 shadow-md bg-white flex items-center justify-center cursor-pointer"
+                    onClick={() => vm?.avatarUrl && setPreviewSrc(vm.avatarUrl)}
+                    aria-label="Ver foto de la instructora"
+                  >
+                    {vm?.avatarUrl ? (
+                      <Image src={vm.avatarUrl} alt="Instructora" width={40} height={40} className="object-cover w-10 h-10" />
+                    ) : (
+                      <div className="w-10 h-10 flex items-center justify-center text-sm font-semibold bg-gradient-to-br from-blue-600 to-indigo-600 text-white">AI</div>
+                    )}
+                  </button>
+                  <div className="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-500 px-3 py-2 rounded-2xl">
+                    <span className="sr-only">Escribiendo…</span>
+                    <span className="inline-block w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.2s]"></span>
+                    <span className="inline-block w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.1s]"></span>
+                    <span className="inline-block w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"></span>
+                  </div>
+                </div>
               )}
               <div ref={messagesEndRef} />
             </div>
@@ -104,7 +200,7 @@ export default function EngineChatLayout({
           </div>
         </div>
 
-        {/* Middle: Contenido Multimedia */}
+        {/* Right side: Contenido Multimedia */}
         <div className={`hidden lg:block transition-all duration-300 ${sidebarOpen ? 'lg:basis-[25%] xl:basis-[20%]' : 'lg:basis-[30%] xl:basis-[25%]'} `}>
           <div className="h-full bg-white m-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
             <div className="px-6 py-4 border-b border-slate-200">
@@ -118,55 +214,32 @@ export default function EngineChatLayout({
             </div>
           </div>
         </div>
-
-        {/* Right side: Progreso (animado al cerrar) */}
-        <div className={`hidden lg:block transition-all duration-300 pr-3 ${sidebarOpen ? 'lg:basis-[15%] xl:basis-[15%] opacity-100' : 'lg:basis-0 opacity-0 pointer-events-none'}`}>
-          <div className={`h-full m-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col bg-white transition-all duration-300 ${sidebarOpen ? 'scale-100' : 'scale-95'}`}>
-            <div className="px-6 py-4 border-b border-slate-200">
-              <h3 className="font-semibold text-slate-900">Progreso de la sesión</h3>
-            </div>
-            <div className="p-6 space-y-4 overflow-y-auto">
-              {vm && state && (
-                <>
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-slate-600">Momento</span>
-                      <span className="font-medium text-slate-900">{state.momentIdx + 1}/{vm.moments.length}</span>
-                    </div>
-                    <div className="w-full bg-slate-100 rounded-full h-2">
-                      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 h-2 rounded-full transition-all" style={{ width: `${Math.round(((state.momentIdx + 1) / Math.max(1, vm.moments.length)) * 100)}%` }} />
-                    </div>
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-medium text-slate-700 mb-2">Momentos</h4>
-                    <div className="space-y-2">
-                      {vm.moments.map((m: any, i: number) => (
-                        <div key={`${m.title}-${i}`} className={`flex items-center gap-2 text-xs ${i === state.momentIdx ? 'text-blue-700' : 'text-slate-500'}`}>
-                          <span className={`w-2 h-2 rounded-full ${i === state.momentIdx ? 'bg-blue-600' : 'bg-slate-300'}`} />
-                          <span className="truncate">{m.title}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  {vm.keyPoints && vm.keyPoints.length > 0 && (
-                    <div>
-                      <h4 className="text-xs font-medium text-slate-700 mb-2">Puntos Clave</h4>
-                      <div className="space-y-2">
-                        {vm.keyPoints.map((kp: any) => (
-                          <div key={kp.id} className={`p-3 rounded-lg border ${kp.completed ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-200'}`}>
-                            <div className="text-xs font-medium text-slate-800">{kp.title}</div>
-                            {kp.description && <div className="text-[11px] text-slate-600 mt-1">{kp.description}</div>}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+      </div>
+      {previewSrc && (
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+          onClick={() => setPreviewSrc(null)}
+        >
+          <div className="relative bg-white rounded-xl shadow-xl p-2" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="absolute -top-3 -right-3 bg-white rounded-full shadow p-1 border"
+              onClick={() => setPreviewSrc(null)}
+              aria-label="Cerrar"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <Image
+              src={previewSrc}
+              alt="Instructora"
+              width={640}
+              height={640}
+              className="max-h-[80vh] h-auto w-auto rounded-lg"
+              priority
+            />
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -14,9 +14,7 @@
       "title": "Saludo",
       "steps": [
         { "code": "M1-EL01", "order": 1, "type": "EXPECTED_LEARNING", "items": [
-          "Comprender qué es un procedimiento de seguridad",
-          "Identificar sus componentes principales",
-          "Aplicar criterios básicos de selección de EPP"
+          "Explicar los componentes del procedimiento de seguridad en situaciones de trabajo, de acuerdo con los estándares y normativas vigentes."
         ]},
         { "code": "M1-KP01", "order": 2, "type": "KEY_POINTS", "items": [
           "Qué es un procedimiento", "Por qué es importante", "Cómo se aplica"

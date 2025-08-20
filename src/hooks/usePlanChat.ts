@@ -10,6 +10,7 @@ export function usePlanChat(planUrl: string = '/courses/SSO001/lessons/lesson02.
 	const [messages, setMessages] = useState<PlanChatMessage[]>([]);
 	const [isTyping, setIsTyping] = useState<boolean>(false);
 	const [done, setDone] = useState<boolean>(false);
+	const [engineState, setEngineState] = useState<{ stepIdx: number; momentIdx: number; done: boolean } | null>(null);
 	const [adaptiveMode, setAdaptiveMode] = useState<boolean>(false);
 	const [budgetMetrics, setBudgetMetrics] = useState<any>(null);
 	const sessionKeyRef = useRef<string>('');
@@ -40,6 +41,10 @@ export function usePlanChat(planUrl: string = '/courses/SSO001/lessons/lesson02.
 
   async function turn(userInput: string) {
 		if (done) return;
+		// Mostrar inmediatamente el mensaje del estudiante
+		if (userInput && userInput.trim()) {
+			setMessages(prev => [...prev, { id: `${idSeq.current++}`, sender: 'student', content: userInput, timestamp: new Date() }]);
+		}
 		setIsTyping(true);
 		try {
 			const res = await fetch('/api/engine/turn', {
@@ -55,11 +60,6 @@ export function usePlanChat(planUrl: string = '/courses/SSO001/lessons/lesson02.
 			});
 			if (!res.ok) throw new Error('engine turn failed');
 			const { message, followUp, state, budgetMetrics: newBudgetMetrics } = await res.json();
-			
-			// Agregar mensaje del estudiante si hay input
-			if (userInput && userInput.trim()) {
-				setMessages(prev => [...prev, { id: `${idSeq.current++}`, sender: 'student', content: userInput, timestamp: new Date() }]);
-			}
 			
 			// Crear UNA sola burbuja del asistente (message + followUp)
 			if (message || followUp) {
@@ -78,6 +78,7 @@ export function usePlanChat(planUrl: string = '/courses/SSO001/lessons/lesson02.
 				});
 			}
 			setDone(Boolean(state?.done));
+			setEngineState(state || null);
 			if (newBudgetMetrics) {
 				setBudgetMetrics(newBudgetMetrics);
 			}
@@ -112,12 +113,13 @@ export function usePlanChat(planUrl: string = '/courses/SSO001/lessons/lesson02.
 		setDone(false);
 		setIsTyping(false);
 		setBudgetMetrics(null);
+		setEngineState(null);
 		bootedRef.current = false;
 		// Reiniciar con nuevo plan
 		void turn('');
 	}
 
-	return { messages, isTyping, done, sendMessage, clearMessages, resetSession, adaptiveMode, setAdaptiveMode, budgetMetrics };
+	return { messages, isTyping, done, sendMessage, clearMessages, resetSession, adaptiveMode, setAdaptiveMode, budgetMetrics, state: engineState };
 }
 
 

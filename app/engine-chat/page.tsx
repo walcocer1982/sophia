@@ -11,6 +11,7 @@ export default function EngineChatPage() {
   const [registry, setRegistry] = useState<Registry | null>(null);
   const [selectedCourseId, setSelectedCourseId] = useState<string>('');
   const [selectedLessonId, setSelectedLessonId] = useState<string>('');
+  const [lessonVM, setLessonVM] = useState<any>(null);
 
   // derive current planUrl from selection
   const planUrl: string | null = useMemo(() => {
@@ -20,7 +21,7 @@ export default function EngineChatPage() {
     return lesson?.planUrl || null;
   }, [registry, selectedCourseId, selectedLessonId]);
 
-  const { messages, isTyping, done, sendMessage, clearMessages, adaptiveMode, setAdaptiveMode, budgetMetrics } = usePlanChat(planUrl || '/courses/SSO001/lessons/lesson02.json');
+  const { messages, isTyping, done, sendMessage, clearMessages, adaptiveMode, setAdaptiveMode, budgetMetrics, state } = usePlanChat(planUrl || '/courses/SSO001/lessons/lesson02.json');
 
   useEffect(() => {
     let alive = true;
@@ -43,20 +44,60 @@ export default function EngineChatPage() {
     return () => { alive = false; };
   }, []);
 
+  // Cargar el plan y construir VM (aprendizaje esperado, puntos clave y momentos) al cambiar planUrl
+  useEffect(() => {
+    let alive = true;
+    if (!planUrl) return;
+    (async () => {
+      try {
+        const res = await fetch(planUrl);
+        if (!res.ok) return;
+        const plan = await res.json();
+        if (!alive) return;
+        const moments = (plan.moments || []).map((m: any) => ({ title: m.title }));
+        const keyPoints: Array<{ id: string; title: string; description?: string; completed?: boolean }> = [];
+        const expectedLearning: string[] = [];
+        (plan.moments || []).forEach((m: any, mi: number) => {
+          (m.steps || []).forEach((s: any) => {
+            if (String(s.type || '').toUpperCase() === 'EXPECTED_LEARNING') {
+              (s.items || []).forEach((it: string) => expectedLearning.push(it));
+            }
+            if (String(s.type || '').toUpperCase() === 'KEY_POINTS') {
+              (s.items || []).forEach((title: string, idx: number) => {
+                keyPoints.push({ id: `${s.code || `M${mi + 1}-KP`}-${idx}` , title, completed: false });
+              });
+            }
+          });
+        });
+        setLessonVM({
+          version: plan?.meta?.version || 'plan',
+          locale: plan?.meta?.language || 'es',
+          moments,
+          keyPoints,
+          expectedLearning,
+          avatarUrl: '/image/sophia_fuentes.png'
+        });
+      } catch {}
+    })();
+    return () => { alive = false; };
+  }, [planUrl]);
+
   // Simple VM/state placeholders for EngineChatLayout
   const vm = useMemo(() => {
     const course = registry?.courses.find(c => c.id === selectedCourseId);
     const lesson = course?.lessons.find(l => l.id === selectedLessonId);
     return {
       title: [course?.name || course?.id, lesson?.name || lesson?.id].filter(Boolean).join(' · ') || 'DocenteIA',
-      version: 'plan',
-      locale: 'es-CL',
-      moments: [],
-      keyPoints: []
+      version: lessonVM?.version || 'plan',
+      locale: lessonVM?.locale || 'es-CL',
+      moments: lessonVM?.moments || [],
+      keyPoints: lessonVM?.keyPoints || [],
+      expectedLearning: lessonVM?.expectedLearning || [],
+      avatarUrl: lessonVM?.avatarUrl || '/image/sophia_fuentes.png'
     } as any;
-  }, [registry, selectedCourseId, selectedLessonId]);
+  }, [registry, selectedCourseId, selectedLessonId, lessonVM]);
 
-  const state = useMemo(() => ({ momentIdx: 0 }), []);
+  const layoutState = useMemo(() => ({ momentIdx: state?.momentIdx || 0 }), [state?.momentIdx]);
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -126,7 +167,7 @@ export default function EngineChatPage() {
           isTyping={isTyping}
           onSend={(t) => sendMessage(t)}
           vm={vm}
-          state={state as any}
+          state={layoutState as any}
         />
       </div>
     </div>
