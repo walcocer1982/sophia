@@ -8,7 +8,7 @@ import { loadAndCompile } from '@/plan/compilePlan';
 import { appendHistory, clearHistory, getRecentHistory } from '@/session/history';
 import { SessionState, initSession } from '@/session/state';
 import { getSessionStore } from '@/session/store';
-
+import { resolveTeacherProfile } from '@/teacher/resolveProfile';
 import fs from 'fs/promises';
 import { NextResponse } from 'next/server';
 import path from 'path';
@@ -118,6 +118,12 @@ export async function POST(req: Request) {
       }
 		}
     const coursePolicies = await loadCoursePolicies(deriveCourseId(state.planUrl));
+    const teacherProfile = resolveTeacherProfile({
+      reqProfile: (body as any)?.teacherProfile,
+      planProfile: (state as any)?.plan?.meta?.teacherProfile,
+      stateProfile: (state as any)?.teacherProfile
+    });
+    (state as any).teacherProfile = teacherProfile;
 		const step = currentStep(state);
 		// Debug inicio de turno
 		try {
@@ -155,7 +161,7 @@ export async function POST(req: Request) {
 		}
 		
 		// 1) Si el alumno pide "permiso" para preguntar (detección semántica de intención)
-		if ((await isStudentAskingQuestionSem(pendingInput)) && !/\w+\?/.test(pendingInput)) {
+		if ((await isStudentAskingQuestionSem(pendingInput, (state as any).teacherProfile)) && !/\w+\?/.test(pendingInput)) {
 			message = '¡Claro! Dime cuál es tu consulta y, cuando quede claro, me lo confirmas para continuar con la clase.';
 			// "pausa": recuerda dónde estás para retomar
 			state.consultCtx.pausedAt = { momentIndex: state.momentIdx!, stepIndex: state.stepIdx! };
@@ -168,7 +174,7 @@ export async function POST(req: Request) {
 		}
 		
 		// 2) Si trae una pregunta concreta (termina en ?)
-		if ((await isStudentAskingQuestionSem(pendingInput)) && /\w+\?/.test(pendingInput)) {
+		if ((await isStudentAskingQuestionSem(pendingInput, (state as any).teacherProfile)) && /\w+\?/.test(pendingInput)) {
 			const recent = await getRecentHistory(sessionKey, 6);
 			const qa = await runDocenteLLM({
 				language: 'es',
@@ -189,7 +195,7 @@ export async function POST(req: Request) {
 		}
 		
 		// 3) Si el alumno confirma que ya entendió, retomas donde quedó
-		if (state.consultCtx.pausedAt && isAffirmativeToResume(pendingInput)) {
+		if (state.consultCtx.pausedAt && isAffirmativeToResume(pendingInput, (state as any).teacherProfile)) {
 			// Debug log
 			if (process.env.ENGINE_DEBUG === 'true') {
 				console.log('[CONSULTA_RESUME]', { resumedFrom: state.consultCtx.pausedAt });
@@ -345,7 +351,12 @@ export async function POST(req: Request) {
               acceptablesEff,
               expected,
               policy,
-              { semThresh: isOpen ? 0.28 : 0.44, semBestThresh: isOpen ? 0.22 : 0.34, maxHints: Number(coursePolicies?.hints?.maxHints ?? 2) },
+              { semThresh: isOpen ? 0.28 : 0.44, semBestThresh: isOpen ? 0.22 : 0.34, maxHints: Number(coursePolicies?.hints?.maxHints ?? 2), vagueCenter: {
+                corpus: (state as any)?.teacherProfile?.eval?.vagueCenter?.corpus,
+                tauVagueMin: (state as any)?.teacherProfile?.eval?.vagueCenter?.tauVagueMin,
+                delta: (state as any)?.teacherProfile?.eval?.vagueCenter?.delta,
+                tauObj: isOpen ? ((state as any)?.teacherProfile?.eval?.vagueCenter?.tauObjOpen ?? 0.28) : ((state as any)?.teacherProfile?.eval?.vagueCenter?.tauObjClosed ?? 0.44)
+              } },
               { hintsUsed }
             );
             cls = { kind: sem.kind, matched: sem.matched, missing: sem.missing, sem: sem.sem };
@@ -600,7 +611,7 @@ export async function POST(req: Request) {
             }
             
             // Detectar si el estudiante está haciendo una pregunta
-            if (isStudentAskingQuestion(pendingInput)) {
+            if (isStudentAskingQuestion(pendingInput, (state as any).teacherProfile)) {
               // Ruta clarify: insertar micro-explicación del objetivo actual
               try {
                 const recent = await getRecentHistory(sessionKey, 4);
@@ -775,7 +786,7 @@ export async function POST(req: Request) {
                   answerType: (act.step.data as any)?.answer_type || 'list',
                   hintsUsed: (state.hintsByAskCode?.[stepCode] || 0),
                   attempts,
-
+                  teacherProfile: (state as any).teacherProfile
                 });
                 message = hintMsg;
                 followUp = '';
