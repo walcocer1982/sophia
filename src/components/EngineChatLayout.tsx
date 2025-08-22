@@ -37,6 +37,35 @@ export default function EngineChatLayout({
     } catch { return []; }
   }, [vm, state]);
 
+  type MediaItem = { url: string; name?: string; description?: string; caption?: string };
+  const deriveNameFromUrl = (u?: string): string => {
+    try {
+      if (!u) return '';
+      const last = u.split('?')[0].split('#')[0].split('/').pop() || '';
+      const base = last.replace(/\.[a-zA-Z0-9]+$/, '');
+      return base.replace(/[\-_]+/g, ' ');
+    } catch { return ''; }
+  };
+  const currentMultimedia: MediaItem[] = useMemo(() => {
+    try {
+      const stepCode: string | undefined = (state as any)?.stepCode || (state as any)?.state?.stepCode;
+      const entry = (vm as any)?.media?.[stepCode || ''] || {};
+      const items = Array.isArray(entry?.items) ? entry.items : [];
+      if (items.length) {
+        return items
+          .map((it: any) => ({
+            url: it?.url || it?.src || it?.image || '',
+            name: it?.name || it?.title || deriveNameFromUrl(it?.url || it?.src || it?.image),
+            description: it?.description || it?.desc || '',
+            caption: it?.caption || it?.label || ''
+          }))
+          .filter((it: MediaItem) => !!it.url);
+      }
+      const imgs = mediaImages;
+      return imgs.map((url) => ({ url, name: deriveNameFromUrl(url), caption: deriveNameFromUrl(url) }));
+    } catch { return mediaImages.map((url) => ({ url, name: deriveNameFromUrl(url), caption: deriveNameFromUrl(url) })); }
+  }, [vm, state, mediaImages]);
+
   useEffect(() => { setMediaIdx(0); }, [mediaImages?.length]);
 
   useEffect(() => {
@@ -139,8 +168,21 @@ export default function EngineChatLayout({
                       <h4 className="text-xs font-medium text-slate-700 mb-2">Momentos</h4>
                       <div className="space-y-2">
                         {vm.moments.map((m: any, i: number) => (
-                          <div key={`${m.title}-${i}`} className={`flex items-center gap-2 text-xs ${i < state.momentIdx ? 'text-green-700' : (i === state.momentIdx ? 'text-blue-700' : 'text-slate-500')}`}>
-                            <span className={`w-2 h-2 rounded-full ${i < state.momentIdx ? 'bg-green-600' : (i === state.momentIdx ? 'bg-blue-600' : 'bg-slate-300')}`} />
+                          <div
+                            key={`${m.title}-${i}`}
+                            className={`flex items-center gap-3 text-xs p-3 rounded-xl border transition-all duration-200 ${
+                              i === state.momentIdx
+                                ? 'bg-blue-50 border-blue-300 shadow-sm ring-2 ring-blue-200 text-blue-700'
+                                : i < state.momentIdx
+                                  ? 'bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-green-700'
+                                  : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-600'
+                            }`}
+                          >
+                            <span
+                              className={`w-2.5 h-2.5 rounded-full ${
+                                i < state.momentIdx ? 'bg-green-600' : (i === state.momentIdx ? 'bg-blue-600' : 'bg-slate-300')
+                              }`}
+                            />
                             <span className="truncate">{m.title}</span>
                           </div>
                         ))}
@@ -242,33 +284,54 @@ export default function EngineChatLayout({
               <h3 className="font-semibold text-slate-900">Contenido Multimedia</h3>
             </div>
             <div className="flex-1 p-6">
-              {isTyping || !mediaImages?.length ? (
+              {isTyping || !currentMultimedia?.length ? (
                 <div className="bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl text-slate-400 border border-slate-200 flex items-center justify-center aspect-video min-h-[180px]">
                   <span className="text-xs">{isTyping ? 'Pensando…' : 'Sin contenido para este paso'}</span>
                 </div>
               ) : (
                 <>
                   <div className="relative rounded-xl overflow-hidden border border-slate-200 aspect-video bg-black/5">
-                    <Image
-                      src={mediaImages[Math.min(mediaIdx, mediaImages.length - 1)]}
+                    <img
+                      src={currentMultimedia[Math.min(mediaIdx, currentMultimedia.length - 1)]?.url}
                       alt="Paso"
-                      fill
-                      sizes="(min-width: 1024px) 33vw, 100vw"
-                      className="object-cover"
+                      className="absolute inset-0 w-full h-full object-cover"
+                      loading="eager"
+                      fetchPriority="high"
                     />
                   </div>
-                  {mediaImages.length > 1 && (
-                    <div className="flex items-center gap-2 mt-3 justify-center">
-                      {mediaImages.map((_, i) => (
-                        <label key={`dot-${i}`} className="inline-flex items-center cursor-pointer">
+                  {/* Texto debajo de la imagen (caption > description > name) */}
+                  <div className="mt-3 text-sm text-slate-700 text-center">
+                    {(currentMultimedia[Math.min(mediaIdx, currentMultimedia.length - 1)]?.caption
+                      || currentMultimedia[Math.min(mediaIdx, currentMultimedia.length - 1)]?.description
+                      || currentMultimedia[Math.min(mediaIdx, currentMultimedia.length - 1)]?.name
+                      || '')}
+                  </div>
+                  {/* Radio buttons para selección de imagen (mostrar también con 1 imagen) */}
+                  {currentMultimedia.length > 0 && (
+                    <div className="flex flex-col space-y-2 mt-3">
+                      {currentMultimedia.map((image, index) => (
+                        <label
+                          key={`mopt-${index}`}
+                          className={`flex items-center space-x-3 cursor-pointer p-3 rounded-xl border transition-all duration-200 ${
+                            mediaIdx === index
+                              ? 'bg-blue-50 border-blue-300 shadow-sm ring-2 ring-blue-200'
+                              : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                          }`}
+                        >
                           <input
                             type="radio"
-                            name="mediaIdx"
-                            className="sr-only"
-                            checked={mediaIdx === i}
-                            onChange={() => setMediaIdx(i)}
+                            name="imageSelector"
+                            checked={mediaIdx === index}
+                            onChange={() => setMediaIdx(index)}
+                            className={`w-4 h-4 focus:ring-2 focus:ring-blue-500 ${
+                              mediaIdx === index
+                                ? 'text-blue-600 bg-blue-600 border-blue-600'
+                                : 'text-blue-600 bg-white border-slate-300'
+                            }`}
                           />
-                          <span className={`w-2.5 h-2.5 rounded-full ${mediaIdx === i ? 'bg-blue-600' : 'bg-slate-300'}`} />
+                          <span className={`text-sm font-medium ${mediaIdx === index ? 'text-blue-700' : 'text-slate-700'}`}>
+                            {image?.name || `Imagen ${index + 1}`}
+                          </span>
                         </label>
                       ))}
                     </div>

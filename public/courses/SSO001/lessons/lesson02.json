@@ -8,9 +8,10 @@
     "generated_at": "2025-08-14T00:00:00Z"
   },
   "media": {
-    "M1-EL01": { "images": ["/courses/SSO001/images/saludo-minero.jpg"] },
-    "M1-N01":  { "images": ["/courses/SSO001/images/saludo-minero.jpg"] },
-    "M1-Q01":  { "images": ["/courses/SSO001/images/saludo-minero.jpg"] },
+    "M1-EL01": { "images": ["https://newsroom.plusatlas.com/uploads/medium/000/001/126/portada_PlusAtlas-33252087-0549-4a7b-aaf6-a2bedce7207f.jpg"] },
+    "M1-N01":  { "images": ["hhttps://newsroom.plusatlas.com/uploads/medium/000/001/126/portada_PlusAtlas-33252087-0549-4a7b-aaf6-a2bedce7207f.jpg"] },
+    "M1-Q01":  { "images": ["https://newsroom.plusatlas.com/uploads/medium/000/001/126/portada_PlusAtlas-33252087-0549-4a7b-aaf6-a2bedce7207f.jpg"] },
+    "M1-KP01": { "images": ["https://newsroom.plusatlas.com/uploads/medium/000/001/126/portada_PlusAtlas-33252087-0549-4a7b-aaf6-a2bedce7207f.jpg"] },
     "M2-N01":  { "images": ["/courses/SSO001/images/instalar-ventanas.png", "/courses/SSO001/images/seguridad-3.jpg"] },
     "M2-Q01":  { "images": ["/courses/SSO001/images/seguridad-3.jpg"] },
     "M2-Q02":  { "images": ["/courses/SSO001/images/seguridad-3.jpg"] },

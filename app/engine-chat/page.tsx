@@ -55,6 +55,7 @@ export default function EngineChatPage() {
         if (!res.ok) return;
         const plan = await res.json();
         if (!alive) return;
+        
         const moments = (plan.moments || []).map((m: any) => ({ title: m.title }));
         const keyPoints: Array<{ id: string; title: string; description?: string; completed?: boolean }> = [];
         const expectedLearning: string[] = [];
@@ -95,7 +96,8 @@ export default function EngineChatPage() {
       moments: lessonVM?.moments || [],
       keyPoints: lessonVM?.keyPoints || [],
       expectedLearning: lessonVM?.expectedLearning || [],
-      avatarUrl: lessonVM?.avatarUrl || '/image/sophia_fuentes.png'
+      avatarUrl: lessonVM?.avatarUrl || '/image/sophia_fuentes.png',
+      media: lessonVM?.media || {}
     } as any;
   }, [registry, selectedCourseId, selectedLessonId, lessonVM]);
 
