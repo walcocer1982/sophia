@@ -10,7 +10,7 @@ export function usePlanChat(planUrl: string = '/courses/SSO001/lessons/lesson02.
 	const [messages, setMessages] = useState<PlanChatMessage[]>([]);
 	const [isTyping, setIsTyping] = useState<boolean>(false);
 	const [done, setDone] = useState<boolean>(false);
-	const [engineState, setEngineState] = useState<{ stepIdx: number; momentIdx: number; done: boolean } | null>(null);
+	const [engineState, setEngineState] = useState<{ stepIdx: number; momentIdx: number; done: boolean; stepCode?: string } | null>(null);
 	const [adaptiveMode, setAdaptiveMode] = useState<boolean>(false);
 	const [budgetMetrics, setBudgetMetrics] = useState<any>(null);
 	const sessionKeyRef = useRef<string>('');
@@ -59,7 +59,7 @@ export function usePlanChat(planUrl: string = '/courses/SSO001/lessons/lesson02.
 				})
 			});
 			if (!res.ok) throw new Error('engine turn failed');
-			const { message, followUp, state, budgetMetrics: newBudgetMetrics } = await res.json();
+			const { message, followUp, state, budgetMetrics: newBudgetMetrics, stepCode, momentIdx } = await res.json();
 			
 			// Crear UNA sola burbuja del asistente (message + followUp)
 			if (message || followUp) {
@@ -78,7 +78,7 @@ export function usePlanChat(planUrl: string = '/courses/SSO001/lessons/lesson02.
 				});
 			}
 			setDone(Boolean(state?.done));
-			setEngineState(state || null);
+			setEngineState(state ? { ...state, stepCode: (stepCode || (state as any)?.stepCode), momentIdx: (typeof momentIdx === 'number' ? momentIdx : (state as any)?.momentIdx) } : null);
 			if (newBudgetMetrics) {
 				setBudgetMetrics(newBudgetMetrics);
 			}

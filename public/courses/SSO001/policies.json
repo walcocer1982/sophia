@@ -15,7 +15,11 @@
       "keywordMin": 1,
       "minTokens": 3
     },
-    "scoring": { "R2": 2, "R1": 1, "R0": 0 }
+    "scoring": { "R2": 2, "R1": 1, "R0": 0 },
+    "semantic": {
+      "open":   { "semThresh": 0.35, "semBestThresh": 0.30 },
+      "closed": { "semThresh": 0.46, "semBestThresh": 0.40 }
+    }
   },
   "thresholds": {
     "conceptual": { "min": 1 },
@@ -27,7 +31,7 @@
     "reflexiva": { "min": 1 }
   },
   "hints": {
-    "wordLimits": [18, 35, 60],
+    "wordLimits": [16, 28, 40],
     "maxHints": 2,
     "escalateAfterAttempts": [1, 2, 3],
     "variants": [
@@ -65,8 +69,8 @@
     "allowQuestions": true
   },
   "advance": {
-    "allowForcedOn": ["SALUDO", "CONEXION"],
-    "maxAttemptsBeforeForce": 2
+    "allowForcedOn": ["SALUDO", "CONEXION", "ADQUISICION", "APLICACION", "DISCUSION", "REFLEXION", "OTRO"],
+    "maxAttemptsBeforeForce": 3
   },
   "vague": {
     "minUsefulTokens": 3,

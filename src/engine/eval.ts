@@ -130,6 +130,8 @@ export function classifyTurn(
 	}
 	const { matched, missing } = computeMatchedMissing(u, acceptable, expected, fuzzy);
 	const hasAny = matched.length > 0;
+	// Aceptación estricta solo por señales "acceptable" (no por extras de expected)
+	const hasAcceptable = matchesAcceptable(user, acceptable);
 	if (policy.type === 'listado') {
 		const k = Math.max(1, policy.thresholdK || 2);
 		if (matched.length >= k) return { kind: 'ACCEPT', matched, missing, reason: 'K_OF_N' };
@@ -143,7 +145,7 @@ export function classifyTurn(
 		return { kind: 'HINT', matched, missing, reason: 'INSUFFICIENT' };
 	}
 	// conceptual, identificacion, etc.
-	if (hasAny) return { kind: 'ACCEPT', matched, missing, reason: 'MATCH_ACCEPTABLE' };
+	if (hasAcceptable) return { kind: 'ACCEPT', matched, missing, reason: 'MATCH_ACCEPTABLE' };
 	if (expected.some(e => u.includes(normalize(e)))) return { kind: 'PARTIAL', matched, missing, reason: 'OBJETIVO_ALINEADO' };
 	return { kind: 'HINT', matched, missing, reason: 'INSUFFICIENT' };
 }
@@ -208,8 +210,7 @@ export function detectTopicDeviation(
 
 
 // Evaluación híbrida (vaguedad → rápido → semántico)
-import { escalateReasoning } from '@/engine/eval-escalation';
-import { buildAskIndex, semanticScore, type AskVectorIndex } from '@/engine/semvec';
+// Importes dinámicos para evitar dependencias de IA (OpenAI) durante carga en tests
 
 export type HybridOpts = {
   fuzzy?: { maxEditDistance?: number; similarityMin?: number };
@@ -263,11 +264,18 @@ export async function evaluateHybrid(
   const fast = classifyTurn(u, policy, acceptable, expected, opts.fuzzy);
   if (fast.kind === 'ACCEPT' || fast.kind === 'PARTIAL') return { ...fast, reason: fast.reason, sem: undefined } as any;
 
-  // 3) Semántico (costoso): embeddings
-  let idx: AskVectorIndex | null = null;
-  try { idx = await buildAskIndex(acceptable, expected); } catch { idx = null; }
-  if (!idx || !idx.centroid?.length) return { kind: 'HINT', reason: 'NO_SEM_MODEL', matched: [], missing: acceptable.slice(0,3) };
-  const { cos, best } = await semanticScore(u, idx);
+  // 3) Semántico (costoso): embeddings (carga diferida)
+  let idx: any = null;
+  let cos = 0; let best: any = null;
+  try {
+    const sem = await import('@/engine/semvec');
+    idx = await sem.buildAskIndex(acceptable, expected);
+    if (!idx || !idx.centroid?.length) return { kind: 'HINT', reason: 'NO_SEM_MODEL', matched: [], missing: acceptable.slice(0,3) };
+    const res = await sem.semanticScore(u, idx);
+    cos = res.cos; best = res.best;
+  } catch {
+    return { kind: 'HINT', reason: 'NO_SEM_MODEL', matched: [], missing: acceptable.slice(0,3) };
+  }
   
   // Debug: embeddings activos
   if (process.env.ENGINE_DEBUG === 'true') {
@@ -297,6 +305,7 @@ export async function evaluateHybrid(
   // Escalamiento a thinker para casos borderline/ambiguos
   if (cos >= 0.4 && cos < semThresh && (best?.cos || 0) >= 0.35) {
     try {
+      const { escalateReasoning } = await import('./eval-escalation');
       const escalation = await escalateReasoning({
         student: user,
         objective: policy.type,
@@ -349,16 +358,24 @@ export async function evaluateSemanticOnly(
   const { semThresh, semBestThresh } = getThresholds();
 
   // Índice + score semántico (objetivo)
-  let idx: AskVectorIndex | null = null;
-  try { idx = await buildAskIndex(acceptable, expected); } catch { idx = null; }
-  if (!idx || !idx.centroid?.length) return { kind: 'HINT', reason: 'NO_SEM_MODEL', matched: [], missing: acceptable.slice(0,3) };
-  const { cos, best } = await semanticScore(u, idx);
+  let idx: any = null;
+  let cos = 0; let best: any = null;
+  try {
+    const sem = await import('@/engine/semvec');
+    idx = await sem.buildAskIndex(acceptable, expected);
+    if (!idx || !idx.centroid?.length) return { kind: 'HINT', reason: 'NO_SEM_MODEL', matched: [], missing: acceptable.slice(0,3) };
+    const res = await sem.semanticScore(u, idx);
+    cos = res.cos; best = res.best;
+  } catch {
+    return { kind: 'HINT', reason: 'NO_SEM_MODEL', matched: [], missing: acceptable.slice(0,3) } as any;
+  }
 
   // Centro vago por embeddings (opcional y configurable)
   if (opts?.vagueCenter?.corpus && Array.isArray(opts.vagueCenter.corpus) && opts.vagueCenter.corpus.length > 0) {
     try {
-      const idxV = await buildAskIndex(opts.vagueCenter.corpus as any, []);
-      const { cos: cosVague } = await semanticScore(u, idxV);
+      const sem = await import('@/engine/semvec');
+      const idxV = await sem.buildAskIndex(opts.vagueCenter.corpus as any, []);
+      const { cos: cosVague } = await sem.semanticScore(u, idxV);
       const tauV = typeof opts.vagueCenter.tauVagueMin === 'number' ? opts.vagueCenter.tauVagueMin : 0.60;
       const delta = typeof opts.vagueCenter.delta === 'number' ? opts.vagueCenter.delta : 0.05;
       const tauObj = typeof opts.vagueCenter.tauObj === 'number' ? opts.vagueCenter.tauObj : semThresh;

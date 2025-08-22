@@ -1,4 +1,5 @@
 import { runDocenteLLM } from '@/ai/orchestrator';
+import { isNoSeInput, shouldGateByMinTokens } from '@/engine/clarify';
 import { evaluateSemanticOnly, type AskPolicy } from '@/engine/eval';
 import { buildDeterministicFeedback as mkFb } from '@/engine/feedback';
 import { extractKeywords, makeHintMessage } from '@/engine/hints';
@@ -12,6 +13,32 @@ import { resolveTeacherProfile } from '@/teacher/resolveProfile';
 import fs from 'fs/promises';
 import { NextResponse } from 'next/server';
 import path from 'path';
+
+
+// Evita repetir frases casi idénticas al componer mensajes
+function composeUniqueText(...parts: Array<string | undefined>): string {
+	const norm = (s: string) => s
+		.toLowerCase()
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '')
+		.replace(/\s+/g, ' ')
+		.trim();
+	const seen = new Set<string>();
+	const out: string[] = [];
+	for (const p of parts) {
+		const text = String(p || '').trim();
+		if (!text) continue;
+		const lines = text.split(/\n+/).map(s => s.trim()).filter(Boolean);
+		for (const line of lines) {
+			const key = norm(line);
+			if (key && !seen.has(key)) {
+				seen.add(key);
+				out.push(line);
+			}
+		}
+	}
+	return out.join('\n\n');
+}
 
 
 type ClientState = {
@@ -170,7 +197,8 @@ export async function POST(req: Request) {
 		}
 		
 		// 1) Si el alumno pide "permiso" para preguntar (detección semántica de intención)
-		if ((await isStudentAskingQuestionSem(pendingInput, (state as any).teacherProfile)) && /\w+\?/.test(pendingInput) === false) {
+		const isNoSeRegex = /^\s*(no\s*(lo\s*)?s[eé]|no\s*est[oó]y?\s*seguro|no\s*s[eé]\s*bien)\s*$/i;
+		if (!isNoSeRegex.test(pendingInput) && (await isStudentAskingQuestionSem(pendingInput, (state as any).teacherProfile)) && /\?\s*$/.test(pendingInput)) {
 			message = '¡Claro! Dime cuál es tu consulta y, cuando quede claro, me lo confirmas para continuar con la clase.';
 			// "pausa": recuerda dónde estás para retomar
 			state.consultCtx.pausedAt = { momentIndex: state.momentIdx!, stepIndex: state.stepIdx! };
@@ -183,7 +211,7 @@ export async function POST(req: Request) {
 		}
 		
 		// 2) Si trae una pregunta concreta (termina en ?)
-		if ((await isStudentAskingQuestionSem(pendingInput, (state as any).teacherProfile)) && /\w+\?/.test(pendingInput)) {
+		if (!isNoSeRegex.test(pendingInput) && (await isStudentAskingQuestionSem(pendingInput, (state as any).teacherProfile)) && /\?\s*$/.test(pendingInput)) {
 			const recent = await getRecentHistory(sessionKey, 6);
 			const qa = await runDocenteLLM({
 				language: 'es',
@@ -274,6 +302,7 @@ export async function POST(req: Request) {
 				}
 				// marcar flag para evitar eco y adelantar estado a la ASK
 				state.justAskedFollowUp = Boolean(followUp);
+				state.lastFollowUpText = followUp;
 				// marca narrativa mostrada
 				try { (state.narrativesShownByMoment ||= {})[act.step.momentIndex] = true; } catch {}
 				if (typeof targetIdx === 'number') { state = advanceTo(state, targetIdx); }
@@ -292,7 +321,8 @@ export async function POST(req: Request) {
 				const lastActionForStep = String(state.lastActionByAskCode?.[stepCodeDyn] || 'ask');
 				const firstAttempt = attemptsSoFar === 0;
 				const afterHint = lastActionForStep === 'hint';
-				const dynamicK = qtype.includes('lista') ? (firstAttempt ? 1 : (afterHint ? 2 : 2)) : undefined;
+				// Escala por intento: S1 exige 2; S2/S3 exige 1
+				const dynamicK = qtype.includes('lista') ? (firstAttempt ? 2 : 1) : undefined;
 				const policy: AskPolicy = qtype.includes('lista') ? { type: 'listado', thresholdK: dynamicK }
 					: qtype.includes('aplica') ? { type: 'aplicacion', requiresJustification: true }
 					: (qtype.includes('abierta') ? { type: 'metacognitiva' } : { type: (qtype as any) || 'conceptual' });
@@ -334,13 +364,56 @@ export async function POST(req: Request) {
               skipGuarantee = true;
               break;
             }
+            // F0/F1: emitir pista motivadora + micro-pregunta y contabilizar intento/ayuda
             try {
+              const askData: any = (act as any)?.step?.data || {};
               const recent = await getRecentHistory(sessionKey, 4);
-              const llm = await runDocenteLLM({ language: 'es', action: 'ask', stepType: 'ASK', questionText: q, objective: String(act.step.data.objective || ''), recentHistory: recent });
-					message = llm.message;
-				} catch { message = q; }
-				break;
-			}
+              const llmHint = await runDocenteLLM({
+                language: 'es',
+                action: 'hint',
+                stepType: 'ASK',
+                questionText: q,
+                objective: String(askData.objective || ''),
+                contentBody: Array.isArray(expected) ? expected : [],
+                hintWordLimit: Number((coursePolicies?.hints?.wordLimits || [16])[0] || 16),
+                allowQuestions: true,
+                recentHistory: recent,
+                attempts: Number(state.attemptsByAskCode?.[stepCode] || 0),
+                hintsUsed: Number(state.hintsByAskCode?.[stepCode] || 0)
+              } as any);
+              message = llmHint.message || '';
+              followUp = llmHint.followUp || q;
+            } catch {
+              message = '';
+              followUp = q;
+            }
+            // Contadores y estado de hint
+            const attemptsMap: any = state.attemptsByAskCode || (state.attemptsByAskCode = {} as any);
+            const hintsMap0: any = state.hintsByAskCode || (state.hintsByAskCode = {} as any);
+            const lastActionMap0: any = state.lastActionByAskCode || (state.lastActionByAskCode = {} as any);
+            attemptsMap[stepCode] = (attemptsMap[stepCode] || 0) + 1;
+            hintsMap0[stepCode] = (hintsMap0[stepCode] || 0) + 1;
+            lastActionMap0[stepCode] = 'hint';
+            state.justAskedFollowUp = Boolean(followUp);
+            state.lastFollowUpText = followUp;
+            // Force advance si aplica tras intentos
+            if ((state.attemptsByAskCode[stepCode] || 0) >= maxAttempts && allowForcedOn.includes(momentKind)) {
+              const nextAskIdx = getNextAskInSameCycle(state, state.stepIdx);
+              if (typeof nextAskIdx === 'number') {
+                state = advanceTo(state, nextAskIdx);
+                followUp = (currentStep(state) as any)?.data?.question || '';
+                state.justAskedFollowUp = Boolean(followUp);
+              }
+              try {
+                const recent = await getRecentHistory(sessionKey, 4);
+                const bridge = await runDocenteLLM({ language: 'es', action: 'advance', stepType: 'ASK', objective: String(act.step.data.objective || ''), recentHistory: recent });
+                message = [message, bridge.message].filter(Boolean).join('\n\n');
+              } catch {}
+            }
+            SESSIONS.set(sessionKey, state);
+            try { await getSessionStore().set(sessionKey, state); } catch {}
+            break;
+          }
           // Evaluación para preguntas abiertas (answer_type: "open")
           const answerType = (act.step.data as any)?.answer_type || '';
           const rubric = (act.step.data as any)?.rubric || {};
@@ -348,28 +421,50 @@ export async function POST(req: Request) {
           const isOpen = (answerType === 'open') || String((act.step.data as any)?.question_type || '').toLowerCase().includes('abierta') || ['SALUDO','CONEXION'].includes(momentKind);
           
           let cls: any;
-          let vague: boolean;
+          let vague: boolean = false;
           const hintsUsed = Number(state.hintsByAskCode?.[stepCode] || 0);
           const attempts = state.attemptsByAskCode?.[stepCode] || 0;
           
           {
-            // Evaluación SOLO con embeddings (incluye abiertas)
+            // Gate previo por tokens útiles (evitar PARTIAL fantasma)
+            const minTokens = Number(((coursePolicies as any)?.evaluation?.thresholds?.minTokens) ?? 3);
+            if (shouldGateByMinTokens(pendingInput, minTokens)) {
+              cls = { kind: 'HINT', reason: 'MIN_TOKENS', matched: [], missing: (Array.isArray(acceptable) && acceptable.length ? acceptable : (expected||[])).slice(0,3) } as any;
+              vague = true;
+            }
+            // Evaluación SOLO con embeddings (incluye abiertas), con umbral de parcial más cercano configurable
+            const evalCfg = (coursePolicies as any)?.evaluation?.semantic || {};
+            const semOpen = evalCfg.open || { semThresh: 0.28, semBestThresh: 0.24 };
+            const semClosed = evalCfg.closed || { semThresh: 0.44, semBestThresh: 0.34 };
+            const th = isOpen ? semOpen : semClosed;
             const acceptablesEff = isOpen ? ((Array.isArray(acceptable) && acceptable.length) ? acceptable : (expected || [])) : acceptable;
-            const sem = await evaluateSemanticOnly(
-              pendingInput,
-              acceptablesEff,
-              expected,
-              policy,
-              { semThresh: isOpen ? 0.28 : 0.44, semBestThresh: isOpen ? 0.22 : 0.34, maxHints: Number(coursePolicies?.hints?.maxHints ?? 2), vagueCenter: {
-                corpus: (state as any)?.teacherProfile?.eval?.vagueCenter?.corpus,
-                tauVagueMin: (state as any)?.teacherProfile?.eval?.vagueCenter?.tauVagueMin,
-                delta: (state as any)?.teacherProfile?.eval?.vagueCenter?.delta,
-                tauObj: isOpen ? ((state as any)?.teacherProfile?.eval?.vagueCenter?.tauObjOpen ?? 0.28) : ((state as any)?.teacherProfile?.eval?.vagueCenter?.tauObjClosed ?? 0.44)
-              } },
-              { hintsUsed }
-            );
-            cls = { kind: sem.kind, matched: sem.matched, missing: sem.missing, sem: sem.sem };
-            vague = false;
+            if (!vague) {
+              const sem = await evaluateSemanticOnly(
+                pendingInput,
+                acceptablesEff,
+                expected,
+                policy,
+                { semThresh: Number(th.semThresh ?? (isOpen ? 0.28 : 0.44)), semBestThresh: Number(th.semBestThresh ?? (isOpen ? 0.22 : 0.34)), maxHints: Number(coursePolicies?.hints?.maxHints ?? 2), vagueCenter: {
+                  corpus: (state as any)?.teacherProfile?.eval?.vagueCenter?.corpus,
+                  tauVagueMin: (state as any)?.teacherProfile?.eval?.vagueCenter?.tauVagueMin,
+                  delta: (state as any)?.teacherProfile?.eval?.vagueCenter?.delta,
+                  tauObj: isOpen ? (Number((state as any)?.teacherProfile?.eval?.vagueCenter?.tauObjOpen ?? th.semThresh)) : (Number((state as any)?.teacherProfile?.eval?.vagueCenter?.tauObjClosed ?? th.semThresh))
+                } },
+                { hintsUsed }
+              );
+              cls = { kind: sem.kind, matched: sem.matched, missing: sem.missing, sem: sem.sem };
+              vague = false;
+            }
+            // Exigir al menos 1 keyword para PARTIAL (no aplica si ACCEPT)
+            if (!vague && cls?.kind !== 'ACCEPT') {
+              try {
+                const kwMin = Number(((coursePolicies as any)?.evaluation?.thresholds?.keywordMin) ?? 1);
+                const kws = Array.isArray(expected) ? expected : [];
+                const textN = String(pendingInput || '').toLowerCase();
+                const kwHits = kws.filter(k => textN.includes(String(k).toLowerCase())).length;
+                if (kwHits < kwMin) { (cls as any).kind = 'HINT'; }
+              } catch {}
+            }
             // Capturar evaluación para rúbrica
             lastClsKind = cls.kind as any;
             lastMatched = Array.isArray(cls.matched) ? cls.matched : [];
@@ -463,8 +558,9 @@ export async function POST(req: Request) {
               // Aplicar la misma lógica de priorización LLM
               const showDeterministic = fbCfg.showDeterministic !== false; // default: true
               const llmHasContent = llm.message && llm.message.trim().length > 30;
+              const noMatches = (cls.matched || []).length === 0;
               
-              if (showDeterministic && !llmHasContent) {
+              if (showDeterministic && (!llmHasContent || noMatches)) {
                 fb = deterministic || '';
               } else {
                 fb = llm.message || '';  // Siempre priorizar LLM
@@ -583,7 +679,7 @@ export async function POST(req: Request) {
             
             SESSIONS.set(sessionKey, state);
             try { await getSessionStore().set(sessionKey, state); } catch {}
-            message = [fb, nextMsg].filter(Boolean).join('\n\n');
+            message = composeUniqueText(fb, nextMsg);
             
             // Debug: verificar la composición final del mensaje
             if (process.env.ENGINE_DEBUG === 'true') {
@@ -603,7 +699,7 @@ export async function POST(req: Request) {
           state.lastAnswerByAskCode![stepCode] = pendingInput;
           const noSeMap = state.noSeCountByAskCode || (state.noSeCountByAskCode = {});
           // Detección real de "no sé" / evasivas - MÁS PERMISIVO
-          const isNo = /^\s*(no\s*(lo\s*)?s[eé]|no\s*est[oó]y?\s*seguro|no\s*s[eé]\s*bien)\s*$/i.test(pendingInput);
+          const isNo = isNoSeInput(pendingInput);
           if (isNo) {
             noSeMap[stepCode] = (noSeMap[stepCode] || 0) + 1;
             // Si es "no sé", además de noSeCount, cuenta intento pedagógico
@@ -626,8 +722,9 @@ export async function POST(req: Request) {
               lastActionMap[stepCode] = 'hint';
             }
             
-            // Detectar si el estudiante está haciendo una pregunta
-            if (isStudentAskingQuestion(pendingInput, (state as any).teacherProfile)) {
+            // Detectar si el estudiante está haciendo una pregunta (solo si NO es no‑sé/vago/HINT)
+            const shouldClarify = !vague && !isNo && cls.kind !== 'HINT' && isStudentAskingQuestion(pendingInput, (state as any).teacherProfile);
+            if (shouldClarify) {
               // Ruta clarify: insertar micro-explicación del objetivo actual
               try {
                 const recent = await getRecentHistory(sessionKey, 4);
@@ -655,7 +752,7 @@ export async function POST(req: Request) {
             
             // Política de reintentos: 0→HINT_1, 1→HINT_2, ≥2→opciones o transición pedagógica
             let fb = '';
-            if (attempts < 2 && (cls.kind === 'HINT' || vague || isNo)) {
+            if (attempts < maxAttempts && (cls.kind === 'HINT' || vague || isNo)) {
               // Mensaje alentador
               try {
                 const fbCfg: any = (coursePolicies as any)?.feedback || {};
@@ -669,17 +766,18 @@ export async function POST(req: Request) {
                 // Siempre priorizar LLM, solo usar determinista como último recurso
                 const showDeterministic = fbCfg.showDeterministic !== false; // default: true
                 const llmHasContent = llmFb.message && llmFb.message.trim().length > 30;
+                const noMatches = (cls.matched || []).length === 0;
                 
                 // Solo usar determinista si:
                 // 1. Está habilitado
-                // 2. El LLM no proporcionó contenido
-                if (showDeterministic && !llmHasContent) {
+                // 2. El LLM no proporcionó contenido o no hay aciertos
+                if (showDeterministic && (!llmHasContent || noMatches)) {
                   fb = deterministic || '';
                 } else {
                   fb = llmFb.message || '';  // Siempre priorizar LLM
                 }
               } catch {}
-              // HINT generado por LLM (objetivo-primero)
+              // HINT generado por LLM (objetivo-primero) + feedback breve
               {
                 const objText = String(act.step.data.objective || state.plan?.meta?.lesson_name || '');
                 const expectedArr = Array.isArray(expected) ? expected : [];
@@ -700,10 +798,53 @@ export async function POST(req: Request) {
                     allowQuestions: true,
                     recentHistory: recent
                   } as any);
-                  message = llmHint.message || '';
-                  followUp = llmHint.followUp || '';
+                  // Componer: feedback (si hay) + pista generada por política + pista LLM
+                  const hintPolicyMsg = makeHintMessage({
+                    questionText: q,
+                    objective: objText,
+                    expected: expectedArr,
+                    missing: missingArr,
+                    answerType: (act.step.data as any)?.answer_type || 'list',
+                    hintsUsed: (state.hintsByAskCode?.[stepCode] || 0),
+                    attempts,
+                    coursePolicies: coursePolicies as any,
+                    teacherProfile: (state as any).teacherProfile
+                  });
+                  const hintMsg = llmHint.message || '';
+                  message = composeUniqueText(fb, hintPolicyMsg, hintMsg);
+                  // Evitar que followUp repita frases del message
+                  let fu = llmHint.followUp || '';
+                  const msgNorm = (message || '').toLowerCase().replace(/\s+/g,' ').trim();
+                  const fuNorm = fu.toLowerCase().replace(/\s+/g,' ').trim();
+                  if (fuNorm && msgNorm.includes(fuNorm)) {
+                    fu = '';
+                  }
+                  // Re-ask guiada por severidad manteniendo mismo objetivo
+                  const attemptsForAsk = attempts; // antes de actualizar contadores
+                  const sev = attemptsForAsk < 1 ? 1 : (attemptsForAsk < 2 ? 2 : 3);
+                  const cues = (expectedArr || []).filter(Boolean).slice(0, 3);
+                  const cuesStr = cues.join(', ');
+                  let nextFu = '';
+                  if (sev === 1) {
+                    nextFu = cuesStr
+                      ? `Menciona 2 elementos de seguridad (${cuesStr}) en 12 palabras.`
+                      : `Menciona 2 elementos de seguridad en 12 palabras.`;
+                  } else if (sev === 2) {
+                    nextFu = cuesStr
+                      ? `Elige 1: ${cuesStr} y di para qué sirve (8–12 palabras).`
+                      : `Elige 1 elemento de seguridad y di para qué sirve (8–12 palabras).`;
+                  } else {
+                    const c1 = cues[0] || 'Arnés';
+                    const c2 = cues[1] || 'Casco';
+                    nextFu = `Completa: ‘${c1} → _____’; ‘${c2} → _____’.`;
+                  }
+                  // Si el LLM ya propuso followUp y no repite mensaje, preferirlo
+                  if (fu && fu.trim() && !String(message || '').toLowerCase().includes(fu.toLowerCase())) {
+                    nextFu = fu;
+                  }
+                  followUp = nextFu || q;
                 } catch {
-                  message = '';
+                  message = fb || '';
                   followUp = q;
                 }
 
@@ -729,7 +870,7 @@ export async function POST(req: Request) {
               const lastAction = state.lastActionByAskCode?.[stepCode] || '';
               const noSeCount = state.noSeCountByAskCode?.[stepCode] || 0;
               
-              const nextAction = (attempts >= 2 && cls.kind === 'HINT') ? 'force_advance' : decideNextAction({
+              const nextAction = (attempts >= maxAttempts && cls.kind === 'HINT') ? 'force_advance' : decideNextAction({
                 lastAction,
                 noSeCount,
                 attempts,
@@ -737,18 +878,71 @@ export async function POST(req: Request) {
               });
               
               if (nextAction === 'force_advance') {
-                // Solo avance forzado en SALUDO/CONEXIÓN
+                // Incluir feedback breve ANTES del puente de avance en el tercer intento
+                try {
+                  const objTextFA = String(act.step.data.objective || state.plan?.meta?.lesson_name || '');
+                  const expectedArrFA = Array.isArray(expected) ? expected : [];
+                  const missingArrFA = Array.isArray(cls.missing) ? cls.missing : [];
+                  // Feedback determinista breve + pista de política
+                  try {
+                    const fbForced = mkFb(
+                      { kind: 'HINT' as any, matched: cls.matched, missing: cls.missing },
+                      { attempts, hintsUsed, coursePolicies }
+                    );
+                    const hintPolicyMsgFA = makeHintMessage({
+                      questionText: q,
+                      objective: objTextFA,
+                      expected: expectedArrFA,
+                      missing: missingArrFA,
+                      answerType: (act.step.data as any)?.answer_type || 'list',
+                      hintsUsed: (state.hintsByAskCode?.[stepCode] || 0),
+                      attempts,
+                      coursePolicies: coursePolicies as any,
+                      teacherProfile: (state as any).teacherProfile
+                    });
+                    message = composeUniqueText(fbForced || '', hintPolicyMsgFA || '', message || '');
+                  } catch {}
+                } catch {}
+                // Avance forzado respetando orden del JSON: NARRATION/CONTENT -> ASK
                 const nextAskIdx = getNextAskInSameCycle(state, state.stepIdx);
                 if (typeof nextAskIdx === 'number') {
+                  try {
+                    // Intentar emitir narrativa previa del mismo momento si existe
+                    const steps: any[] = state?.plan?.allSteps || [];
+                    const ask = steps[nextAskIdx];
+                    const targetMoment = ask?.momentIndex;
+                    let narrationIdx: number | undefined = undefined;
+                    for (let i = 0; i < steps.length; i++) {
+                      const s = steps[i];
+                      if (s?.momentIndex !== targetMoment) continue;
+                      if (s.stepIndex < ask.stepIndex && (s.type === 'NARRATION' || s.type === 'CONTENT')) { narrationIdx = i; break; }
+                      if (s.stepIndex >= ask.stepIndex) break;
+                    }
+                    if (typeof narrationIdx === 'number') {
+                      // Emitir narrativa si no se mostró
+                      const stKey = `${steps[narrationIdx].momentIndex}-${steps[narrationIdx].stepIndex}`;
+                      const shownMap = state.shownByStepIndex || (state.shownByStepIndex = {});
+                      if (!(shownMap as any)[stKey]) {
+                        try {
+                          const recent = await getRecentHistory(sessionKey, 4);
+                          const explain = await runDocenteLLM({ language: 'es', action: 'explain', stepType: steps[narrationIdx].type, narrationText: steps[narrationIdx].data?.text || '', contentBody: steps[narrationIdx].data?.body || [], objective: String(state.plan?.meta?.lesson_name || ''), recentHistory: recent });
+                          message = composeUniqueText(message, explain.message || '');
+                          (shownMap as any)[stKey] = true;
+                        } catch {}
+                      }
+                    }
+                  } catch {}
+                  // Posicionar en la ASK objetivo y setear followUp
                   state = advanceTo(state, nextAskIdx);
                   followUp = (currentStep(state) as any)?.data?.question || '';
                   state.justAskedFollowUp = Boolean(followUp);
+                  state.lastFollowUpText = followUp;
                 }
-                // Mensaje de cierre suave
+                // Puente breve (si procede)
                 try {
                   const recent = await getRecentHistory(sessionKey, 4);
                   const bridge = await runDocenteLLM({ language: 'es', action: 'advance', stepType: 'ASK', objective: String(act.step.data.objective || ''), recentHistory: recent });
-                  message = [fb, bridge.message].filter(Boolean).join('\n\n');
+                  message = composeUniqueText(message, bridge.message);
                 } catch {}
                 dbg = { kind: cls.kind, matched: cls.matched?.slice(0,3) || [], missing: cls.missing?.slice(0,3) || [], nextAction: 'force_advance', stepCode };
               } else if (nextAction === 'options') {
@@ -929,6 +1123,8 @@ export async function POST(req: Request) {
 			followUp, 
 			assessment,
 			state: { stepIdx: state.stepIdx, done: state.done },
+			stepCode: (currentStep(state) as any)?.code || undefined,
+			momentIdx: state.momentIdx,
 			budgetMetrics 
 		});
 	} catch (err: any) {

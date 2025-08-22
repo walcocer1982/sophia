@@ -1,8 +1,6 @@
 import { getClient, pickModel } from '@/lib/ai';
 import { DocentePromptContext, buildSystemPrompt, buildUserPrompt } from './prompt';
 
-const client = getClient();
-
 function stripQuestions(text?: string): string {
   const raw = (text || '').trim();
   if (!raw) return '';
@@ -44,50 +42,86 @@ function stripRepeatedFromHistory(text: string, ctx: DocentePromptContext): stri
 export async function runDocenteLLM(ctx: DocentePromptContext): Promise<{ message: string; followUp?: string }> {
   const system = buildSystemPrompt(ctx);
   const user = buildUserPrompt(ctx);
-  const model = pickModel('cheap'); // Usar modelo barato para redacción docente
-  const r = await client.responses.create({
-    model,
-    input: [
-      { role: 'system', content: system },
-      { role: 'user', content: user },
-    ],
-    temperature: 0.30,
-  });
-  const out = ((r as any).output_text || '').trim();
+  const model = pickModel('cheap');
+  let offline = false;
+  let out = '';
+  try {
+    const client = getClient();
+    const r = await client.responses.create({
+      model,
+      input: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      temperature: 0.30,
+    });
+    out = ((r as any).output_text || '').trim();
+  } catch {
+    offline = true;
+  }
+
+  if (!offline) {
+    if (ctx.action === 'explain') {
+      return { message: stripQuestions(out) };
+    }
+    if (ctx.action === 'ask') {
+      const q = (ctx.questionText || '').trim();
+      let msg = stripQuestions(out).replace(/^\s*Docente\s*:\s*/i, '').trim();
+      msg = stripRepeatedFromHistory(msg, ctx);
+      const norm = (s: string) => s.replace(/\s+/g, ' ').toLowerCase();
+      const already = norm(msg).includes(norm(q));
+      const merged = already ? msg : [msg, q].filter(Boolean).join('\n\n');
+      return { message: merged };
+    }
+    if (ctx.action === 'ok' || ctx.action === 'advance') {
+      let msg = stripQuestions(out).replace(/^\s*Docente\s*:\s*/i, '').trim();
+      msg = stripRepeatedFromHistory(msg, ctx);
+      return { message: msg };
+    }
+    if (ctx.action === 'hint') {
+      let msg = stripQuestions(out).replace(/^\s*Docente\s*:\s*/i, '').trim();
+      msg = stripRepeatedFromHistory(msg, ctx);
+      const follow = lastQuestion(out);
+      return { message: msg, followUp: follow };
+    }
+    if (ctx.action === 'ask_simple' || ctx.action === 'ask_options') {
+      const msg = stripRepeatedFromHistory(out.replace(/^\s*Docente\s*:\s*/i, '').trim(), ctx);
+      return { message: msg };
+    }
+    if (ctx.action === 'feedback') {
+      const msg = stripRepeatedFromHistory(out.replace(/^\s*Docente\s*:\s*/i, '').trim(), ctx);
+      return { message: msg };
+    }
+    return { message: out };
+  }
+
+  // Offline fallback determinista (sin OpenAI)
+  const q = (ctx.questionText || '').trim();
   if (ctx.action === 'explain') {
-    return { message: stripQuestions(out) };
+    const parts = [
+      ctx.narrationText,
+      ...(Array.isArray(ctx.contentBody) ? ctx.contentBody : []),
+      ctx.caseText,
+      ctx.objective,
+    ].filter(Boolean).join(' ');
+    return { message: stripQuestions(parts).slice(0, 400) };
   }
   if (ctx.action === 'ask') {
-    // Garantizar que la pregunta final sea la del JSON
-    const q = (ctx.questionText || '').trim();
-    let msg = stripQuestions(out);
-    msg = stripRepeatedFromHistory(msg, ctx);
-    const norm = (s: string) => s.replace(/\s+/g, ' ').toLowerCase();
-    const already = norm(msg).includes(norm(q));
-    return { message: already ? msg : [msg, q].filter(Boolean).join('\n\n') };
+    return { message: q };
   }
-  if (ctx.action === 'ok' || ctx.action === 'advance') {
-    // Evitar que el reconocimiento o el puente incluyan preguntas
-    let msg = stripQuestions(out);
-    msg = stripRepeatedFromHistory(msg, ctx);
-    return { message: msg };
+  if (ctx.action === 'advance') {
+    return { message: 'Puente breve al siguiente foco.' };
   }
   if (ctx.action === 'hint') {
-    let msg = stripQuestions(out);
-    msg = stripRepeatedFromHistory(msg, ctx);
-    const follow = lastQuestion(out);
-    return { message: msg, followUp: follow };
+    return { message: 'Pista breve alineada al objetivo.', followUp: q ? q : '¿Una micro‑pregunta?' };
   }
   if (ctx.action === 'ask_simple' || ctx.action === 'ask_options') {
-    const msg = stripRepeatedFromHistory(out, ctx);
-    return { message: msg };
+    return { message: q };
   }
   if (ctx.action === 'feedback') {
-    // No eliminar preguntas en feedback; solo evitar re‑narración repetida
-    const msg = stripRepeatedFromHistory(out, ctx);
-    return { message: msg };
+    return { message: 'FB: refuerzo/guía breve.' };
   }
-  return { message: out };
+  return { message: q };
 }
 
 

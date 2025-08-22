@@ -4,7 +4,7 @@ type LessonVM = any;
 type EngineState = any;
 import { Clock, Menu, Send, User, X } from 'lucide-react';
 import Image from 'next/image';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import VoiceRecorder from './VoiceRecorder';
 
 export type EngineChatMessage = { id: string; sender: 'ai'|'student'; content: string; timestamp: Date };
@@ -26,8 +26,32 @@ export default function EngineChatLayout({
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+  const stickRef = useRef<boolean>(true);
+  const [mediaIdx, setMediaIdx] = useState<number>(0);
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isTyping]);
+  const mediaImages: string[] = useMemo(() => {
+    try {
+      const stepCode: string | undefined = (state as any)?.stepCode || (state as any)?.state?.stepCode;
+      const images = (vm as any)?.media?.[stepCode || '']?.images;
+      return Array.isArray(images) ? images.filter(Boolean) : [];
+    } catch { return []; }
+  }, [vm, state]);
+
+  useEffect(() => { setMediaIdx(0); }, [mediaImages?.length]);
+
+  useEffect(() => {
+    if (stickRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isTyping]);
+
+  const onMessagesScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    try {
+      const el = e.currentTarget;
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      stickRef.current = distanceFromBottom < 120; // pegarse al fondo salvo que el usuario suba
+    } catch { stickRef.current = true; }
+  };
 
   const handleSend = () => {
     if (!inputValue.trim()) return;
@@ -57,33 +81,44 @@ export default function EngineChatLayout({
         </div>
       </header>
 
-      <div className="flex h-[calc(100vh-72px)]">
+      <div className="flex h-[calc(100vh-72px)] max-w-screen-2xl mx-auto">
         {/* Left side: Panel informativo (Aprendizaje esperado, Puntos clave y Progreso) */}
-        <div className={`hidden lg:block transition-all duration-300 pl-3 ${sidebarOpen ? 'lg:basis-[15%] xl:basis-[15%] opacity-100' : 'lg:basis-0 opacity-0 pointer-events-none'}`}>
+        <div className={`hidden lg:block transition-all duration-300 pl-3 ${sidebarOpen ? 'lg:basis-[22%] xl:basis-[22%] opacity-100' : 'lg:basis-0 opacity-0 pointer-events-none'} min-w-[240px]`}>
           <div className={`h-full m-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col bg-white transition-all duration-300 ${sidebarOpen ? 'scale-100' : 'scale-95'}`}>
             <div className="px-6 py-4 border-b border-slate-200">
-              <h3 className="font-semibold text-slate-900">Resumen de la sesión</h3>
+              <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                <span className="inline-block w-2 h-2 rounded-full bg-blue-600" />
+                Resumen de la sesión
+              </h3>
             </div>
             <div className="p-6 space-y-4 overflow-y-auto">
               {vm && state && (
                 <>
                   {Array.isArray(vm.expectedLearning) && vm.expectedLearning.length > 0 && (
                     <div>
-                      <h4 className="text-xs font-medium text-slate-700 mb-2">Aprendizaje esperado</h4>
-                      <ul className="list-disc ml-4 space-y-1">
+                      <h4 className="text-xs font-medium text-slate-700 mb-2 flex items-center gap-2">
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500" />
+                        Aprendizaje esperado
+                      </h4>
+                      <div className="space-y-2">
                         {vm.expectedLearning.map((it: string, i: number) => (
-                          <li key={`el-${i}`} className="text-xs text-slate-700">{it}</li>
+                          <div key={`el-${i}`} className="text-xs text-slate-800 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-lg px-3 py-2">
+                            {it}
+                          </div>
                         ))}
-                      </ul>
+                      </div>
                     </div>
                   )}
                   <div>
                     {vm.keyPoints && vm.keyPoints.length > 0 && (
                       <div>
-                        <h4 className="text-xs font-medium text-slate-700 mb-2">Puntos Clave</h4>
+                        <h4 className="text-xs font-medium text-slate-700 mb-2 flex items-center gap-2">
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500" />
+                          Puntos clave
+                        </h4>
                         <div className="space-y-2">
                           {vm.keyPoints.map((kp: any) => (
-                            <div key={kp.id} className={`p-3 rounded-lg border ${kp.completed ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-200'}`}>
+                            <div key={kp.id} className={`p-3 rounded-lg border ${kp.completed ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-200' : 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100'}`}>
                               <div className="text-xs font-medium text-slate-800">{kp.title}</div>
                               {kp.description && <div className="text-[11px] text-slate-600 mt-1">{kp.description}</div>}
                             </div>
@@ -104,8 +139,8 @@ export default function EngineChatLayout({
                       <h4 className="text-xs font-medium text-slate-700 mb-2">Momentos</h4>
                       <div className="space-y-2">
                         {vm.moments.map((m: any, i: number) => (
-                          <div key={`${m.title}-${i}`} className={`flex items-center gap-2 text-xs ${i === state.momentIdx ? 'text-blue-700' : 'text-slate-500'}`}>
-                            <span className={`w-2 h-2 rounded-full ${i === state.momentIdx ? 'bg-blue-600' : 'bg-slate-300'}`} />
+                          <div key={`${m.title}-${i}`} className={`flex items-center gap-2 text-xs ${i < state.momentIdx ? 'text-green-700' : (i === state.momentIdx ? 'text-blue-700' : 'text-slate-500')}`}>
+                            <span className={`w-2 h-2 rounded-full ${i < state.momentIdx ? 'bg-green-600' : (i === state.momentIdx ? 'bg-blue-600' : 'bg-slate-300')}`} />
                             <span className="truncate">{m.title}</span>
                           </div>
                         ))}
@@ -119,10 +154,10 @@ export default function EngineChatLayout({
         </div>
 
         {/* Main chat (centro, más ancho que multimedia) */}
-        <div className={`transition-all duration-300 w-full ${sidebarOpen ? 'lg:basis-[60%] xl:basis-[65%]' : 'lg:basis-[70%] xl:basis-[75%]'}`}>
+        <div className={`transition-all duration-300 w-full flex-1 min-w-[420px]`}>
           <div className="h-full bg-white m-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6" onScroll={onMessagesScroll}>
               {messages.map((m) => (
                 <div key={m.id} className={`flex items-start space-x-4 ${m.sender === 'student' ? 'flex-row-reverse space-x-reverse' : ''}`}>
                   {m.sender === 'ai' ? (
@@ -143,8 +178,8 @@ export default function EngineChatLayout({
                       <User className="w-5 h-5" />
                     </div>
                   )}
-                  <div className={`flex-1 max-w-[85%] ${m.sender === 'student' ? 'text-right' : ''}`}>
-                    <div className={`inline-block px-5 py-3 rounded-2xl shadow-sm ${m.sender === 'student' ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white' : 'bg-white border border-slate-200 text-slate-900'}`}>
+                  <div className={`flex-1 ${m.sender === 'student' ? 'text-right' : ''}`}>
+                    <div className={`inline-block px-5 py-3 rounded-2xl shadow-sm max-w-[70ch] ${m.sender === 'student' ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white' : 'bg-white border border-slate-200 text-slate-900'}`}>
                       <p className="text-sm leading-relaxed whitespace-pre-wrap">{m.content}</p>
                     </div>
                     <div className={`mt-2 flex items-center space-x-2 ${m.sender === 'student' ? 'justify-end' : 'justify-start'}`}>
@@ -201,15 +236,45 @@ export default function EngineChatLayout({
         </div>
 
         {/* Right side: Contenido Multimedia */}
-        <div className={`hidden lg:block transition-all duration-300 ${sidebarOpen ? 'lg:basis-[25%] xl:basis-[20%]' : 'lg:basis-[30%] xl:basis-[25%]'} `}>
+        <div className={`hidden lg:block transition-all duration-300 ${sidebarOpen ? 'lg:basis-[42%] xl:basis-[44%]' : 'lg:basis-[42%] xl:basis-[44%]'} min-w-[360px]`}>
           <div className="h-full bg-white m-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
             <div className="px-6 py-4 border-b border-slate-200">
               <h3 className="font-semibold text-slate-900">Contenido Multimedia</h3>
             </div>
             <div className="flex-1 p-6">
-              <div className="bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl text-slate-400 border border-slate-200 flex items-center justify-center aspect-video min-h-[180px]">
-                <span className="text-xs">Imagen/Video</span>
-              </div>
+              {isTyping || !mediaImages?.length ? (
+                <div className="bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl text-slate-400 border border-slate-200 flex items-center justify-center aspect-video min-h-[180px]">
+                  <span className="text-xs">{isTyping ? 'Pensando…' : 'Sin contenido para este paso'}</span>
+                </div>
+              ) : (
+                <>
+                  <div className="relative rounded-xl overflow-hidden border border-slate-200 aspect-video bg-black/5">
+                    <Image
+                      src={mediaImages[Math.min(mediaIdx, mediaImages.length - 1)]}
+                      alt="Paso"
+                      fill
+                      sizes="(min-width: 1024px) 33vw, 100vw"
+                      className="object-cover"
+                    />
+                  </div>
+                  {mediaImages.length > 1 && (
+                    <div className="flex items-center gap-2 mt-3 justify-center">
+                      {mediaImages.map((_, i) => (
+                        <label key={`dot-${i}`} className="inline-flex items-center cursor-pointer">
+                          <input
+                            type="radio"
+                            name="mediaIdx"
+                            className="sr-only"
+                            checked={mediaIdx === i}
+                            onChange={() => setMediaIdx(i)}
+                          />
+                          <span className={`w-2.5 h-2.5 rounded-full ${mediaIdx === i ? 'bg-blue-600' : 'bg-slate-300'}`} />
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
               <div className="mt-4 text-xs text-slate-600">Contenido multimedia de la sesión</div>
             </div>
           </div>

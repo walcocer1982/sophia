@@ -10,6 +10,7 @@
     "lint": "next lint",
     "test": "vitest",
     "chat-demo": "tsx src/index.ts",
+    "chat-nose": "tsx scripts/chatNoSe.ts",
     "clean": "rm -rf .next node_modules package-lock.json && npm install",
     "type-check": "tsc --noEmit"
   },
@@ -46,6 +47,7 @@
     "eslint-config-next": "^15.0.0",
     "flatrepo": "^1.2.0",
     "postcss": "^8.4.0",
+    "react-test-renderer": "^18.3.1",
     "tailwindcss": "^3.4.0",
     "tsx": "^4.7.0",
     "typescript": "^5.0.0",

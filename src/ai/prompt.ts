@@ -22,6 +22,9 @@ export type DocentePromptContext = {
   kind?: 'ACCEPT' | 'PARTIAL' | 'HINT' | 'REFOCUS';
   closureCriteria?: string;
   allowQuestions?: boolean;
+  // contexto pedagógico para severidad de ayudas
+  attempts?: number;
+  hintsUsed?: number;
 };
 
 export function buildSystemPrompt(ctx: DocentePromptContext): string {
@@ -106,11 +109,20 @@ export function buildUserPrompt(ctx: DocentePromptContext): string {
       pushIf(matched.length, `Aciertos: ${matched.join(', ')}`);
       pushIf(missing.length, `Faltantes: ${missing.join(', ')}`);
       const limit = ctx.hintWordLimit || 18;
+      const att = Number(ctx.attempts || 0);
+      const sev = att <= 0 ? 'S1' : (att === 1 ? 'S2' : 'S3');
       lines.push(
-        `Tarea: primero escribe UNA pista (${limit} palabras aprox., sin signos de interrogación) orientada al OBJETIVO (no listar soluciones ni definiciones generales). ` +
+        `Tarea: primero escribe UNA pista (${limit} palabras aprox., sin signos de interrogación) orientada al OBJETIVO (concreta, sin definiciones generales). ` +
         `Luego, en una línea aparte, UNA sola micro‑pregunta (≤8 palabras) centrada en el objetivo o el primer faltante. Nunca devuelvas solo preguntas.`
       );
-      lines.push('Reglas: evita repetir la misma micro‑pregunta usada en el turno previo (usa Historial reciente). No re‑narrar el caso.');
+      if (sev === 'S1') {
+        lines.push('Severidad S1: pista neutral y breve; NO ofrecer opciones todavía; micro‑pregunta directa (≤8 palabras).');
+      } else if (sev === 'S2') {
+        lines.push('Severidad S2: facilita con OPCIÓN: "elige 1" (usa Faltantes o Pistas de contenido), permite respuesta corta (8–12 palabras). Micro‑pregunta ≤8 palabras.');
+      } else {
+        lines.push('Severidad S3: solicita formato “Elemento → función” en UNA frase. Después, prepara transición breve si persiste la duda.');
+      }
+      lines.push('Reglas: evita repetir la misma micro‑pregunta usada en el turno previo (usa Historial reciente). No re‑narrar el caso. Evita frases meta como "Es importante..."/"Es fundamental..."; sé concreto. No repitas en la micro‑pregunta frases ya usadas en el feedback o la pista.');
       break;
     }
 

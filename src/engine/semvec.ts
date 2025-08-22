@@ -1,8 +1,6 @@
 import { getClient } from '@/lib/ai';
 import { getBudgetManager, pickModelWithBudget } from './costs';
 
-const client = getClient();
-
 export type AskVectorIndex = {
 	acceptables: string[];
 	expected: string[];
@@ -23,6 +21,7 @@ function cosine(a: number[], b: number[]): number {
 export async function embedTexts(texts: string[]): Promise<number[][]> {
 	if (!texts || texts.length === 0) return [];
 	const model = pickModelWithBudget('embed');
+	const client = getClient();
 	const res = await client.embeddings.create({ model: model as any, input: texts });
 	
 	// Registrar uso de embeddings para costeo

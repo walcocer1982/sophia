@@ -69,30 +69,39 @@ export function makeHintMessage(opts: {
 
   // cues: prioriza missing; si no hay, usa expected
   const cuesArr = (missing?.length ? missing : expected || []).slice(0, mentionCount);
-  const cueLine = cuesArr.length ? `Menciona: ${cuesArr.join(', ')}.` : '';
+  const cueLine = cuesArr.length ? `Menciona ${cuesArr.join(', ')}.` : '';
 
   const variants = hp.variants || [];
   const opener = variants.length ? variants[hintsUsed % variants.length] : '';
+  const openerClean = opener ? (/[.!?]$/.test(opener.trim()) ? opener.trim() : `${opener.trim()}.`) : '';
+
+  const replaceTokens = (tmpl: string, tokens: Record<string, string>): string => {
+    let out = String(tmpl || '');
+    for (const [k, v] of Object.entries(tokens)) {
+      const re2 = new RegExp(`\\{\\{\s*${k}\s*\\}\\}`, 'g');
+      const re1 = new RegExp(`\\{\s*${k}\s*\\}`, 'g');
+      out = out.replace(re2, v).replace(re1, v);
+    }
+    return out;
+  };
 
   if (answerType === 'open') {
-    const tmpl = hp.templates?.open?.hint || `Comparte tus ideas en al menos {minWords} palabras. {cuesLine}`;
     const fallbackAspects: string[] = (hp.templates as any)?.open?.fallbackAspects || [];
     const aspects = cuesArr.length ? cuesArr : fallbackAspects;
-    const cuesLine = aspects.length ? `Guíate por: ${aspects.join(', ')}.` : '';
-    const msg = tmpl
-      .replace('{minWords}', String(wordLimits[0]))
-      .replace('{cuesLine}', cuesLine);
-    // Para preguntas abiertas, evitar cortar el mensaje por caracteres para no truncar frases
+    const cuesLine = aspects.length ? `Por ejemplo, considera ${aspects.join(', ')}.` : '';
+    const msg = [`Comparte tus ideas en al menos ${wordLimits[0]} palabras.`, cuesLine]
+      .map(s => s.trim())
+      .filter(Boolean)
+      .join(' ')
+      .replace(/gu[ií]ate\s+por\s*:\s*/i, '');
     return msg.trim();
   }
 
-  const base = hp.templates?.objective || '{opener} Enfócate en {keywords}. {cueLine}';
-  const msg = base
-    .replace('{opener}', opener)
-    .replace('{keywords}', kws.join(', '))
-    .replace('{cueLine}', cueLine);
-
-  return msg.trim().slice(0, maxMsgChars);
+  // Construcción más natural: oraciones separadas y sin duplicados
+  const focus = kws.length ? `Enfócate en ${kws.join(', ')}.` : '';
+  const parts = [openerClean, focus, cueLine].map(s => (s || '').trim()).filter(Boolean);
+  const msg = parts.join(' ');
+  return msg.slice(0, maxMsgChars);
 }
 
 export function makeReaskMessage(opts: {
@@ -112,11 +121,21 @@ export function makeReaskMessage(opts: {
     const minw = (hp.wordLimits || [16])[0];
     const base = buildStudentFacingBase(questionText, objective, expected);
     const aspectsLabel = (hp.templates as any)?.open?.aspectsLabel || 'tus ideas principales';
-    return tmpl
-      .replace('{minWords}', String(minw))
-      .replace('{maxWords}', String(minw + 8))
-      .replace('{aspects}', aspectsLabel)
-      .replace('{objective}', base);
+    const replaceTokens = (s: string, tokens: Record<string, string>) => {
+      let out = s;
+      for (const [k, v] of Object.entries(tokens)) {
+        const re2 = new RegExp(`\\{\\{\s*${k}\s*\\}\\}`, 'g');
+        const re1 = new RegExp(`\\{\s*${k}\s*\\}`, 'g');
+        out = out.replace(re2, v).replace(re1, v);
+      }
+      return out;
+    };
+    return replaceTokens(tmpl, {
+      minWords: String(minw),
+      maxWords: String(minw + 8),
+      aspects: aspectsLabel,
+      objective: base
+    });
   }
   const reaskTmpls = (hp.templates?.reask || {}) as Record<'list'|'definition'|'procedure'|'choice', string>;
   const maxWords = (hp.wordLimits || [16])[0];
@@ -127,89 +146,22 @@ export function makeReaskMessage(opts: {
     choice: reaskTmpls.choice || ''
   };
   const fallback = `Menciona en ${maxWords} palabras 2 elementos de ${baseStr}.`;
-  return (map[answerType] || '')
-    .replace('{maxWords}', String(maxWords))
-    .replace('{base}', baseStr) || fallback;
+  const replaceTokens = (s: string, tokens: Record<string, string>) => {
+    let out = s;
+    for (const [k, v] of Object.entries(tokens)) {
+      const re2 = new RegExp(`\\{\\{\s*${k}\s*\\}\\}`, 'g');
+      const re1 = new RegExp(`\\{\s*${k}\s*\\}`, 'g');
+      out = out.replace(re2, v).replace(re1, v);
+    }
+    return out;
+  };
+  const raw = map[answerType] || '';
+  const rendered = replaceTokens(raw, { maxWords: String(maxWords), base: baseStr });
+  return rendered || fallback;
 }
 
 // Funciones legacy para compatibilidad - eliminar después de migración
-export function makeObjectiveHint(args: {
-  objective: string;
-  expected: string[];
-  missing: string[];
-  variants?: string[];
-  wordLimit?: number;
-}) {
-  return makeHintMessage({
-    questionText: '',
-    objective: args.objective,
-    expected: args.expected,
-    missing: args.missing,
-    hintsUsed: 0,
-    attempts: 1,
-    coursePolicies: {
-      hints: {
-        variants: args.variants,
-        wordLimits: [args.wordLimit || 16]
-      }
-    }
-  });
-}
-
-export function makeObjectiveReask(args: {
-  questionText: string;
-  objective: string;
-  expected: string[];
-  answerType?: 'list' | 'definition' | 'procedure' | 'choice';
-  maxWords?: number;
-}) {
-  return makeReaskMessage({
-    questionText: args.questionText,
-    objective: args.objective,
-    expected: args.expected,
-    answerType: args.answerType,
-    coursePolicies: {
-      hints: {
-        wordLimits: [args.maxWords || 16]
-      }
-    }
-  });
-}
-
-export function makeOpenHint({ objective, aspects = [], minWords = 12 }: {
-  objective: string; aspects?: string[]; minWords?: number;
-}) {
-  return makeHintMessage({
-    questionText: '',
-    objective,
-    expected: aspects,
-    missing: [],
-    answerType: 'open',
-    hintsUsed: 0,
-    attempts: 1,
-    coursePolicies: {
-      hints: {
-        wordLimits: [minWords]
-      }
-    }
-  });
-}
-
-export function makeOpenReask({ objective, aspects = [], minWords = 12 }: {
-  objective: string; aspects?: string[]; minWords?: number;
-}) {
-  return makeReaskMessage({
-    questionText: '',
-    objective,
-    expected: aspects,
-    answerType: 'open',
-    coursePolicies: {
-      hints: {
-        wordLimits: [minWords]
-      }
-    }
-  });
-}
+// (legacy wrappers eliminados tras migración)
 
 
 
