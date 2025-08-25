@@ -7,22 +7,6 @@
     "ordered": true,
     "generated_at": "2025-08-14T00:00:00Z"
   },
-  "media": {
-    "M1-EL01": { "images": ["/courses/SSO001/images/saludo-minero.jpg"] },
-    "M1-N01":  { "images": ["/courses/SSO001/images/saludo-minero.jpg"] },
-    "M1-Q01":  { "images": ["/courses/SSO001/images/saludo-minero.jpg"] },
-    "M2-N01":  { "images": ["/courses/SSO001/images/instalar-ventanas.png", "/courses/SSO001/images/seguridad-3.jpg"] },
-    "M2-Q01":  { "images": ["/courses/SSO001/images/seguridad-3.jpg"] },
-    "M2-Q02":  { "images": ["/courses/SSO001/images/seguridad-3.jpg"] },
-    "M3-C01":  { "images": ["/courses/SSO001/images/arnes.jpg"] },
-    "M3-Q01":  { "images": ["/courses/SSO001/images/arnes.jpg"] },
-    "M4-CASE01": { "images": ["/courses/SSO001/images/instalar-ventanas-2.jpg"] },
-    "M4-Q01":  { "images": ["/courses/SSO001/images/instalar-ventanas-2.jpg"] },
-    "M5-TOP01": { "images": ["/courses/SSO001/images/accidente.jpg"] },
-    "M5-Q01":  { "images": ["/courses/SSO001/images/accidente.jpg"] },
-    "M6-REF01": { "images": ["/courses/SSO001/images/accidente-2.jpg"] },
-    "M6-Q01":  { "images": ["/courses/SSO001/images/accidente-2.jpg"] }
-  },
   "moments": [
     {
       "code": "M1",

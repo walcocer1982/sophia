@@ -55,6 +55,16 @@ export default function EngineChatPage() {
         if (!res.ok) return;
         const plan = await res.json();
         if (!alive) return;
+        // Fusionar media del plan con documento externo en /public/media/{course}.json
+        let mergedMedia: any = plan?.media || {};
+        try {
+          const docUrl = selectedCourseId ? `/media/${selectedCourseId}.json` : '/media/SSO001.json';
+          const mRes = await fetch(`/api/media?planUrl=${encodeURIComponent(planUrl)}&docUrl=${encodeURIComponent(docUrl)}`);
+          if (mRes.ok) {
+            const mJson = await mRes.json();
+            mergedMedia = mJson?.media || mergedMedia;
+          }
+        } catch {}
         const moments = (plan.moments || []).map((m: any) => ({ title: m.title }));
         const keyPoints: Array<{ id: string; title: string; description?: string; completed?: boolean }> = [];
         const expectedLearning: string[] = [];
@@ -77,7 +87,7 @@ export default function EngineChatPage() {
           keyPoints,
           expectedLearning,
           avatarUrl: '/image/sophia_fuentes.png',
-          media: plan?.media || {}
+          media: mergedMedia
         });
       } catch {}
     })();
@@ -95,7 +105,8 @@ export default function EngineChatPage() {
       moments: lessonVM?.moments || [],
       keyPoints: lessonVM?.keyPoints || [],
       expectedLearning: lessonVM?.expectedLearning || [],
-      avatarUrl: lessonVM?.avatarUrl || '/image/sophia_fuentes.png'
+      avatarUrl: lessonVM?.avatarUrl || '/image/sophia_fuentes.png',
+      media: lessonVM?.media || {}
     } as any;
   }, [registry, selectedCourseId, selectedLessonId, lessonVM]);
 
