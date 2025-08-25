@@ -1,5 +1,6 @@
 import { getClient, pickModel } from '@/lib/ai';
-import { DocentePromptContext, buildSystemPrompt, buildUserPrompt } from './prompt';
+import type { DocentePromptContext } from './prompt_parts/types';
+import { buildSystemPrompt, buildUserPrompt } from './prompt';
 
 function stripQuestions(text?: string): string {
   const raw = (text || '').trim();
@@ -39,6 +40,40 @@ function stripRepeatedFromHistory(text: string, ctx: DocentePromptContext): stri
   return kept.join('\n\n').trim();
 }
 
+// Antiduplicación interna: elimina oraciones repetidas dentro del mismo mensaje
+function stripSelfDuplicates(text: string): string {
+  const raw = (text || '').trim();
+  if (!raw) return '';
+  const bannedStart = /^los\s+procedimientos\s+de\s+seguridad\s+incluyen/i;
+  const normMap = new Set<string>();
+  const bannedSeen = new Set<string>();
+
+  const paragraphs = raw.split(/\n\n+/).map(s => s.trim()).filter(Boolean);
+  const keptParas: string[] = [];
+  for (const p of paragraphs) {
+    const sentences = p.split(/(?<=[\.!?])\s+/).map(s => s.trim()).filter(Boolean);
+    const keptSentences: string[] = [];
+    for (const s of sentences) {
+      if (!s) continue;
+      const n = normalizeForMatch(s);
+      if (!n) continue;
+      if (bannedStart.test(s)) {
+        const key = 'banned:los_procedimientos_de_seguridad_incluyen';
+        if (bannedSeen.has(key)) continue;
+        bannedSeen.add(key);
+      }
+      if (normMap.has(n)) continue;
+      normMap.add(n);
+      keptSentences.push(s);
+    }
+    const joined = keptSentences.join(' ')
+      .replace(/\s+\n/g, '\n')
+      .trim();
+    if (joined) keptParas.push(joined);
+  }
+  return keptParas.join('\n\n').trim();
+}
+
 export async function runDocenteLLM(ctx: DocentePromptContext): Promise<{ message: string; followUp?: string }> {
   const system = buildSystemPrompt(ctx);
   const user = buildUserPrompt(ctx);
@@ -68,28 +103,54 @@ export async function runDocenteLLM(ctx: DocentePromptContext): Promise<{ messag
       const q = (ctx.questionText || '').trim();
       let msg = stripQuestions(out).replace(/^\s*Docente\s*:\s*/i, '').trim();
       msg = stripRepeatedFromHistory(msg, ctx);
+      msg = stripSelfDuplicates(msg);
       const norm = (s: string) => s.replace(/\s+/g, ' ').toLowerCase();
       const already = norm(msg).includes(norm(q));
       const merged = already ? msg : [msg, q].filter(Boolean).join('\n\n');
       return { message: merged };
     }
     if (ctx.action === 'ok' || ctx.action === 'advance') {
-      let msg = stripQuestions(out).replace(/^\s*Docente\s*:\s*/i, '').trim();
+      let raw = out.replace(/^\s*Docente\s*:\s*/i, '').trim();
+      // Intentar parsear PUENTE: en advance
+      if (ctx.action === 'advance') {
+        const m = raw.match(/PUENTE\s*:\s*(.+)$/im);
+        if (m) {
+          const bridge = stripSelfDuplicates(stripQuestions(m[1] || '').trim());
+          return { message: bridge };
+        }
+      }
+      let msg = stripQuestions(raw);
       msg = stripRepeatedFromHistory(msg, ctx);
+      msg = stripSelfDuplicates(msg);
       return { message: msg };
     }
     if (ctx.action === 'hint') {
-      let msg = stripQuestions(out).replace(/^\s*Docente\s*:\s*/i, '').trim();
+      let raw = out.replace(/^\s*Docente\s*:\s*/i, '').trim();
+      // Parse labels: MICRO / PISTA
+      const microMatch = raw.match(/^\s*MICRO\s*:\s*(.+)$/im);
+      const pistaMatch = raw.match(/^\s*PISTA\s*:\s*(.+)$/im);
+      if (microMatch || pistaMatch) {
+        const fuLines = (microMatch?.[1] || '').split(/\n+/).map(s => s.trim()).filter(Boolean);
+        const fu = (fuLines[0] || '').trim();
+        let hint = (pistaMatch?.[1] || '').trim();
+        // Quitar prefijos redundantes como "Te doy una pista:" si vinieran del modelo
+        hint = hint.replace(/^te\s+doy\s+una\s+pista\s*:\s*/i, '').trim();
+        const message = stripSelfDuplicates(stripRepeatedFromHistory(stripQuestions(hint), ctx));
+        return { message, followUp: fu };
+      }
+      // Fallback a lógica anterior si no hay etiquetas
+      let msg = stripQuestions(raw).trim();
       msg = stripRepeatedFromHistory(msg, ctx);
-      const follow = lastQuestion(out);
+      msg = stripSelfDuplicates(msg);
+      const follow = lastQuestion(raw);
       return { message: msg, followUp: follow };
     }
     if (ctx.action === 'ask_simple' || ctx.action === 'ask_options') {
-      const msg = stripRepeatedFromHistory(out.replace(/^\s*Docente\s*:\s*/i, '').trim(), ctx);
+      const msg = stripSelfDuplicates(stripRepeatedFromHistory(out.replace(/^\s*Docente\s*:\s*/i, '').trim(), ctx));
       return { message: msg };
     }
     if (ctx.action === 'feedback') {
-      const msg = stripRepeatedFromHistory(out.replace(/^\s*Docente\s*:\s*/i, '').trim(), ctx);
+      const msg = stripSelfDuplicates(stripRepeatedFromHistory(out.replace(/^\s*Docente\s*:\s*/i, '').trim(), ctx));
       return { message: msg };
     }
     return { message: out };
@@ -113,7 +174,7 @@ export async function runDocenteLLM(ctx: DocentePromptContext): Promise<{ messag
     return { message: 'Puente breve al siguiente foco.' };
   }
   if (ctx.action === 'hint') {
-    return { message: 'Pista breve alineada al objetivo.', followUp: q ? q : '¿Una micro‑pregunta?' };
+    return { message: 'Te doy una pista: menciona 1–2 elementos clave del objetivo.', followUp: q ? q : '¿Una micro‑pregunta?' };
   }
   if (ctx.action === 'ask_simple' || ctx.action === 'ask_options') {
     return { message: q };

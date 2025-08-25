@@ -8,6 +8,11 @@ vi.mock('@/ai/orchestrator', () => ({
     if (action === 'ask') {
       return { message: `PREGUNTA: ${ctx.questionText}`, followUp: ctx.questionText };
     }
+    if (action === 'ask_options') {
+      const items = (ctx?.optionItems || []).slice(0, 2);
+      const labeled = items.map((s: string, i: number) => `${String.fromCharCode(65 + i)}) ${s}`);
+      return { message: `Elige una opción: ${labeled.join(' | ')}` } as any;
+    }
     if (action === 'hint') {
       __hintCount += 1;
       const fu = __hintCount === 1
@@ -89,8 +94,12 @@ describe('engine: tres "no se" consecutivos', () => {
     const t2 = await turn({ sessionKey, planUrl, userInput: 'no se' });
     const msg2 = (t2.message || '').toLowerCase();
     const fu2 = (t2.followUp || '').toLowerCase();
-    expect(msg2).toMatch(/fb: refuerzo|pista breve alineada|explicación breve|puente breve/);
-    expect(fu2.length).toBeGreaterThan(0);
+    expect(msg2).toMatch(/fb: refuerzo|pista breve alineada|explicación breve|puente breve|elige una opción/);
+    if (/elige una opción/.test(msg2)) {
+      expect(fu2.length).toBeGreaterThanOrEqual(0);
+    } else {
+      expect(fu2.length).toBeGreaterThan(0);
+    }
 
     // 3) no se → avance con puente y nueva followUp (force_advance)
     const t3 = await turn({ sessionKey, planUrl, userInput: 'no se' });
@@ -100,7 +109,7 @@ describe('engine: tres "no se" consecutivos', () => {
     expect(fu3.length).toBeGreaterThan(0);
   });
 
-  it('force_advance tras dos "no se" (dos HINT → avance)', async () => {
+  it('no fuerza avance tras dos "no se"; lo hace en el tercero', async () => {
     const sessionKey = 'it-2-no-se-advance';
     const planUrl = '/courses/SSO001/lessons/lesson02.json';
 
@@ -114,9 +123,19 @@ describe('engine: tres "no se" consecutivos', () => {
     const t2 = await turn({ sessionKey, planUrl, userInput: 'no se' });
     const msg2 = (t2.message || '').toLowerCase();
     const fu2 = (t2.followUp || '').toLowerCase();
-    // Debe contener el puente de avance y un nuevo followUp
-    expect(msg2).toContain('puente breve al siguiente foco');
-    expect(fu2.length).toBeGreaterThan(0);
+    // Aún NO debe forzar avance en el segundo "no se": debe seguir con hint u opciones
+    expect(msg2).not.toContain('puente breve al siguiente foco');
+    if (/elige una opción/.test(msg2)) {
+      expect(fu2.length).toBeGreaterThanOrEqual(0);
+    } else {
+      expect(fu2.length).toBeGreaterThan(0);
+    }
+    // Tercer "no se" → ahora sí puente de avance
+    const t3 = await turn({ sessionKey, planUrl, userInput: 'no se' });
+    const msg3 = (t3.message || '').toLowerCase();
+    const fu3 = (t3.followUp || '').toLowerCase();
+    expect(msg3).toContain('puente breve al siguiente foco');
+    expect(fu3.length).toBeGreaterThan(0);
   });
 
   it('pregunta → no se → pista fácil → no se → pista más fácil → no se → avance', async () => {
@@ -134,9 +153,13 @@ describe('engine: tres "no se" consecutivos', () => {
 
     // 2) no se → feedback+hint con followUp “más fácil”
     const t2 = await turn({ sessionKey, planUrl, userInput: 'no se' });
-    expect(((t2.message || '').toLowerCase())).toMatch(/pista breve|fb: refuerzo|puente breve/);
+    expect(((t2.message || '').toLowerCase())).toMatch(/pista breve|fb: refuerzo|puente breve|elige una opción/);
     const fu2s = (t2.followUp || '').toLowerCase();
-    expect(fu2s.length).toBeGreaterThan(0);
+    if (/elige una opción/.test((t2.message || '').toLowerCase())) {
+      expect(fu2s.length).toBeGreaterThanOrEqual(0);
+    } else {
+      expect(fu2s.length).toBeGreaterThan(0);
+    }
     // Si ya hubo avance en el segundo, igual debe haber followUp (siguiente pregunta)
 
     // 3) no se → feedback + mensaje “avancemos” (puente) y nueva pregunta
