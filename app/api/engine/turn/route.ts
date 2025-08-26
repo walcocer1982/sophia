@@ -12,6 +12,9 @@ import { resolveTeacherProfile } from '@/teacher/resolveProfile';
 import fs from 'fs/promises';
 import { NextResponse } from 'next/server';
 import path from 'path';
+import { getHintWordLimit } from '@/ai/tools/PolicyTool';
+import { pickTwoOptions } from '@/ai/tools/OptionsTool';
+import { decideForceAdvanceByNoSe } from '@/ai/tools/InputGuardrail';
 
 
 // Evita repetir frases casi idénticas al componer mensajes
@@ -353,9 +356,8 @@ export async function POST(req: Request) {
             try {
               const askData: any = (act as any)?.step?.data || {};
               const recent = await getRecentHistory(sessionKey, 4);
-              const wl0 = Array.isArray((coursePolicies as any)?.hints?.wordLimits) ? (coursePolicies as any).hints.wordLimits as number[] : [16, 28, 40];
-              const sevIdx0 = Math.min(Number(state.hintsByAskCode?.[stepCode] || 0), Math.max(0, wl0.length - 1));
-              const hintLimit0 = Number(wl0[sevIdx0] || wl0[0] || 16);
+              const sevIdx0 = Number(state.hintsByAskCode?.[stepCode] || 0);
+              const hintLimit0 = getHintWordLimit(coursePolicies, sevIdx0);
               const llmHint = await runDocenteLLM({
                 language: 'es',
                 action: 'hint',
@@ -694,7 +696,8 @@ export async function POST(req: Request) {
             try {
               const momentKindNow = mapMomentKind(state.plan?.moments?.[act.step.momentIndex]?.title);
               const noSeCountNow = state.noSeCountByAskCode?.[stepCode] || 0;
-              if (isNo && forceNoSeThreshold > 0 && noSeCountNow >= forceNoSeThreshold && Array.isArray(allowForcedOn) && allowForcedOn.includes(momentKindNow)) {
+              const forceDecision = decideForceAdvanceByNoSe({ noSeCount: noSeCountNow, forceNoSeThreshold, allowForcedOn, momentKind: momentKindNow });
+              if (isNo && forceDecision.shouldForceAdvance) {
                 // Mover a la siguiente ASK del mismo ciclo, respetando narrativa previa
                 const nextAskIdx = getNextAskInSameCycle(state, state.stepIdx);
                 if (typeof nextAskIdx === 'number') {
@@ -780,9 +783,9 @@ export async function POST(req: Request) {
                 const noSeCountNow = Number(state.noSeCountByAskCode?.[stepCode] || 0);
                 if (isNo && noSeCountNow === 2) {
                   const itemsSrc = (Array.isArray(cls.missing) && (cls.missing as any[]).length > 0) ? (cls.missing as string[]) : (expected || []);
-                  const items = Array.from(new Set(itemsSrc.filter(Boolean))).slice(0, 2);
+                  const items = pickTwoOptions(itemsSrc, expected || []);
                   if (items.length >= 2) {
-                    const recent = await getRecentHistory(sessionKey, 4);
+                const recent = await getRecentHistory(sessionKey, 4);
                     const llm = await runDocenteLLM({
                       language: 'es',
                       action: 'ask_options',
@@ -817,9 +820,8 @@ export async function POST(req: Request) {
                 const missingArr = Array.isArray(cls.missing) ? cls.missing : [];
                 try {
                   const recent = await getRecentHistory(sessionKey, 4);
-                  const wl = Array.isArray((coursePolicies as any)?.hints?.wordLimits) ? (coursePolicies as any).hints.wordLimits as number[] : [16, 28, 40];
-                  const sevIdx = Math.min(Number(state.hintsByAskCode?.[stepCode] || 0), Math.max(0, wl.length - 1));
-                  const hintLimit = Number(wl[sevIdx] || wl[0] || 16);
+                  const sevIdx = Number(state.hintsByAskCode?.[stepCode] || 0);
+                  const hintLimit = getHintWordLimit(coursePolicies, sevIdx);
                   const llmHint = await runDocenteLLM({
                     language: 'es',
                     action: 'hint',
@@ -877,7 +879,8 @@ export async function POST(req: Request) {
               const lastAction = state.lastActionByAskCode?.[stepCode] || '';
               const noSeCount = state.noSeCountByAskCode?.[stepCode] || 0;
               
-              const earlyForce = (cls.kind === 'HINT') && (forceNoSeThreshold > 0) && (noSeCount >= forceNoSeThreshold) && allowForcedOn.includes(momentKind);
+              const forceDecision = decideForceAdvanceByNoSe({ noSeCount, forceNoSeThreshold, allowForcedOn, momentKind });
+              const earlyForce = (cls.kind === 'HINT') && forceDecision.shouldForceAdvance;
               const nextAction = (earlyForce || (attempts >= maxAttempts && cls.kind === 'HINT')) ? 'force_advance' : decideNextAction({
                 lastAction,
                 noSeCount,
@@ -938,7 +941,7 @@ export async function POST(req: Request) {
                 dbg = { kind: cls.kind, matched: cls.matched?.slice(0,3) || [], missing: cls.missing?.slice(0,3) || [], nextAction: 'force_advance', stepCode };
               } else if (nextAction === 'options') {
                 // Presentar opciones basadas en expected
-                const items = (expected || []).filter(Boolean).slice(0, 5);
+                const items = pickTwoOptions((expected || []).filter(Boolean));
                 try {
                   const recent = await getRecentHistory(sessionKey, 4);
                   const llm = await runDocenteLLM({
@@ -977,21 +980,20 @@ export async function POST(req: Request) {
               } else if (nextAction === 'hint') {
                 // Emitir una pista adicional breve exclusivamente desde LLM
                 try {
-                  const objText = String(act.step.data.objective || state.plan?.meta?.lesson_name || '');
-                  const expectedArr = Array.isArray(expected) ? expected : [];
-                  const missingArr = Array.isArray(cls.missing) ? cls.missing : [];
+                const objText = String(act.step.data.objective || state.plan?.meta?.lesson_name || '');
+                const expectedArr = Array.isArray(expected) ? expected : [];
+                const missingArr = Array.isArray(cls.missing) ? cls.missing : [];
                   const recent = await getRecentHistory(sessionKey, 4);
-                  const wl3 = Array.isArray((coursePolicies as any)?.hints?.wordLimits) ? (coursePolicies as any).hints.wordLimits as number[] : [16, 28, 40];
-                  const sevIdx3 = Math.min(Number(state.hintsByAskCode?.[stepCode] || 0), Math.max(0, wl3.length - 1));
-                  const hintLimit3 = Number(wl3[sevIdx3] || wl3[0] || 16);
+                  const sevIdx3 = Number(state.hintsByAskCode?.[stepCode] || 0);
+                  const hintLimit3 = getHintWordLimit(coursePolicies, sevIdx3);
                   const llmHint2 = await runDocenteLLM({
                     language: 'es',
                     action: 'hint',
                     stepType: 'ASK',
-                    questionText: q,
+                  questionText: q,
                     userAnswer: pendingInput,
                     matched: cls.matched,
-                    missing: missingArr,
+                  missing: missingArr,
                     objective: objText,
                     contentBody: expectedArr,
                     hintWordLimit: hintLimit3,
@@ -1003,8 +1005,8 @@ export async function POST(req: Request) {
                   state.justAskedFollowUp = Boolean(followUp);
                 } catch {
                   message = '';
-                  followUp = '';
-                  state.justAskedFollowUp = false;
+                followUp = '';
+                state.justAskedFollowUp = false;
                 }
                 // Actualizar última acción
                 lastActionMap[stepCode] = 'hint';
