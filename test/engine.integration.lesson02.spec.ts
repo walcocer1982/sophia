@@ -10,6 +10,11 @@ vi.mock('@/ai/orchestrator', () => ({
     if (action === 'hint') {
       return { message: 'Pista breve alineada al objetivo.', followUp: '¿Una micro‑pregunta?' };
     }
+    if (action === 'ask_options') {
+      const items = (ctx?.optionItems || []).slice(0, 2);
+      const labeled = items.map((s: string, i: number) => `${String.fromCharCode(65 + i)}) ${s}`);
+      return { message: `Elige una opción: ${labeled.join(' | ')}` };
+    }
     if (action === 'feedback') {
       return { message: 'FB: refuerzo/guía breve.' };
     }

@@ -1,4 +1,5 @@
 import type { LessonPlan } from '@/plan/types';
+import type { RagIndex } from '@/ai/tools/RagTool';
 
 export type SessionState = {
 	planUrl: string;
@@ -37,8 +38,12 @@ export type SessionState = {
 	// Contexto de consultas para pausar/retomar
 	consultCtx?: {
 		pausedAt?: { momentIndex: number; stepIndex: number };
+		active?: boolean;
+		turns?: number;
 	};
 	lastFollowUpText?: string;
+  // RAG index construido desde la lección (guía)
+  ragIndex?: RagIndex;
 };
 
 export function initSession(planUrl: string, plan: LessonPlan): SessionState {

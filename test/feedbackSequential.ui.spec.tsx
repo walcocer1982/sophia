@@ -1,3 +1,4 @@
+import React from 'react';
 import FeedbackSequential from '@/components/FeedbackSequential';
 import TestRenderer, { act } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
