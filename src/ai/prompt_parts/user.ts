@@ -45,6 +45,7 @@ export function renderHint(ctx: DocentePromptContext, lines: string[], contentIt
   lines.push('PISTA: <conéctala explícitamente con el OBJETIVO (sin listas ni definiciones) >');
   lines.push('IMPORTANTE: La micro‑pregunta debe estar DIRECTAMENTE relacionada con el OBJETIVO. Si el objetivo es "Elicitar expectativas del estudiante sobre la importancia de los procedimientos de seguridad", la micro‑pregunta debe ayudar al estudiante a expresar sus expectativas sobre la importancia de los procedimientos de seguridad.');
   lines.push('Alinea ambas líneas con los principios: gradualidad cognitiva, andamiaje progresivo, conexión experiencial, diagnóstico continuo, construcción semántica, economía pedagógica y preservación del desafío.');
+  lines.push('Evita frases meta o didascálicas (p. ej., "voy a darte una pista" o "esta es una micro‑pregunta"): produce directamente el contenido solicitado.');
   lines.push('MICRO debe apuntar exclusivamente al OBJETIVO (diagnóstico), referenciar si procede algo del Historial reciente o del contexto del estudiante (conexión experiencial) y mantener el desafío (≤8 palabras, sin dar contenido nuevo).');
   lines.push(`PISTA debe ofrecer el apoyo mínimo necesario (andamiaje) conectado al OBJETIVO (economía), sin revelar la respuesta (preservar desafío) y pudiendo introducir gradualmente 1 término clave de la disciplina si aporta (construcción semántica). Límite ≈ ${limit} palabras.`);
   lines.push('No incluyas prefijos como "PISTA:" o "Te doy una pista:" dentro del contenido; usa solo la etiqueta en la línea.');

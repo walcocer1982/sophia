@@ -1,6 +1,7 @@
 import { getClient, pickModel } from '@/lib/ai';
 import type { DocentePromptContext } from './prompt_parts/types';
 import { buildSystemPrompt, buildUserPrompt } from './prompt';
+import { guardAdvanceOutput, guardFeedbackOutput, guardHintOutput } from './outputGuardrails';
 
 function stripQuestions(text?: string): string {
   const raw = (text || '').trim();
@@ -116,13 +117,13 @@ export async function runDocenteLLM(ctx: DocentePromptContext): Promise<{ messag
         const m = raw.match(/PUENTE\s*:\s*(.+)$/im);
         if (m) {
           const bridge = stripSelfDuplicates(stripQuestions(m[1] || '').trim());
-          return { message: bridge };
+          return { message: guardAdvanceOutput(ctx, bridge) };
         }
       }
       let msg = stripQuestions(raw);
       msg = stripRepeatedFromHistory(msg, ctx);
       msg = stripSelfDuplicates(msg);
-      return { message: msg };
+      return { message: guardAdvanceOutput(ctx, msg) };
     }
     if (ctx.action === 'hint') {
       let raw = out.replace(/^\s*Docente\s*:\s*/i, '').trim();
@@ -135,15 +136,15 @@ export async function runDocenteLLM(ctx: DocentePromptContext): Promise<{ messag
         let hint = (pistaMatch?.[1] || '').trim();
         // Quitar prefijos redundantes como "Te doy una pista:" si vinieran del modelo
         hint = hint.replace(/^te\s+doy\s+una\s+pista\s*:\s*/i, '').trim();
-        const message = stripSelfDuplicates(stripRepeatedFromHistory(stripQuestions(hint), ctx));
-        return { message, followUp: fu };
+        const cleaned = stripSelfDuplicates(stripRepeatedFromHistory(stripQuestions(hint), ctx));
+        return guardHintOutput(ctx, { message: cleaned, followUp: fu });
       }
       // Fallback a lógica anterior si no hay etiquetas
       let msg = stripQuestions(raw).trim();
       msg = stripRepeatedFromHistory(msg, ctx);
       msg = stripSelfDuplicates(msg);
       const follow = lastQuestion(raw);
-      return { message: msg, followUp: follow };
+      return guardHintOutput(ctx, { message: msg, followUp: follow });
     }
     if (ctx.action === 'ask_simple' || ctx.action === 'ask_options') {
       const msg = stripSelfDuplicates(stripRepeatedFromHistory(out.replace(/^\s*Docente\s*:\s*/i, '').trim(), ctx));
@@ -151,7 +152,7 @@ export async function runDocenteLLM(ctx: DocentePromptContext): Promise<{ messag
     }
     if (ctx.action === 'feedback') {
       const msg = stripSelfDuplicates(stripRepeatedFromHistory(out.replace(/^\s*Docente\s*:\s*/i, '').trim(), ctx));
-      return { message: msg };
+      return { message: guardFeedbackOutput(ctx, msg) };
     }
     return { message: out };
   }

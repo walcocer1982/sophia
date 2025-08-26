@@ -1,4 +1,5 @@
 "use client";
+import React from 'react';
 import { classifyTurn, isNoSe } from "@/engine/eval";
 import { buildTraceEntry, computeFeedbackLabel } from "@/engine/feedbackSequencer";
 import { makeHintMessage, makeReaskMessage } from "@/engine/hints";
