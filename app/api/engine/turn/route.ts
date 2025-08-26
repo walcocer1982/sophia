@@ -4,6 +4,8 @@ import { isNoSeInput, shouldGateByMinTokens } from '@/engine/clarify';
 import { evaluateSemanticOnly, type AskPolicy } from '@/engine/eval';
 // import { extractKeywords } from '@/engine/hints';
 import { isAffirmativeToResume, isStudentAskingQuestion, isStudentAskingQuestionSem } from '@/engine/questions';
+import { isGreetingInput } from '@/engine/questions';
+import { isPersonalInfoQuery } from '@/engine/questions';
 import { advanceTo, currentStep, decideAction, decideNextAction, getNextAskInSameCycle, next } from '@/engine/runner';
 import { loadAndCompile } from '@/plan/compilePlan';
 import { appendHistory, clearHistory, getRecentHistory } from '@/session/history';
@@ -17,6 +19,7 @@ import { getHintWordLimit } from '@/ai/tools/PolicyTool';
 import { pickTwoOptions } from '@/ai/tools/OptionsTool';
 import { decideForceAdvanceByNoSe } from '@/ai/tools/InputGuardrail';
 import { pickVariant, varyHintLimit } from '@/ai/ab';
+import { buildLessonRagIndex } from '@/ai/tools/RagTool';
 
 
 // Evita repetir frases casi idénticas al componer mensajes
@@ -119,6 +122,7 @@ export async function POST(req: Request) {
 			if (adaptiveMode) {
 				state.adaptiveMode = true;
 			}
+      try { (state as any).ragIndex = await buildLessonRagIndex((state as any).plan); } catch {}
 			SESSIONS.set(sessionKey, state);
 			try { await getSessionStore().set(sessionKey, state); } catch {}
 		}
@@ -199,6 +203,52 @@ export async function POST(req: Request) {
 				state
 			});
 		}
+
+		// Saludos: responder cálido y retomar la pregunta vigente
+		if (pendingInput.trim() && isGreetingInput(pendingInput)) {
+			const st = currentStep(state);
+			const q = st?.type === 'ASK' ? (st as any).data?.question || '' : '';
+			try {
+				const recent = await getRecentHistory(sessionKey, 6);
+				const greet = await runFeedbackAgent({
+					language: 'es',
+					action: 'feedback',
+					stepType: 'ASK',
+					questionText: pendingInput,
+					objective: String((st as any)?.data?.objective || state.plan?.meta?.lesson_name || ''),
+					recentHistory: recent,
+					allowQuestions: true,
+					conversationMode: true
+				} as any);
+				message = (greet.message || '').trim();
+			} catch { message = ''; }
+			followUp = q;
+			state.justAskedFollowUp = Boolean(followUp);
+			return NextResponse.json({ message, followUp, state });
+		}
+
+		// Consulta personal: responder con alias y redirigir al objetivo (vía LLM)
+		if (pendingInput.trim() && isPersonalInfoQuery(pendingInput)) {
+			const st = currentStep(state);
+			const q = st?.type === 'ASK' ? (st as any).data?.question || '' : '';
+			try {
+				const recent = await getRecentHistory(sessionKey, 6);
+				const resp = await runFeedbackAgent({
+					language: 'es',
+					action: 'feedback',
+					stepType: 'ASK',
+					questionText: pendingInput,
+					objective: String((st as any)?.data?.objective || state.plan?.meta?.lesson_name || ''),
+					recentHistory: recent,
+					allowQuestions: true,
+					conversationMode: true
+				} as any);
+				message = (resp.message || '').trim();
+			} catch { message = ''; }
+			followUp = q;
+			state.justAskedFollowUp = Boolean(followUp);
+			return NextResponse.json({ message, followUp, state });
+		}
 		
 		// --- CONSULTA ACTIVA: si ya estamos en modo consulta, responder cualquier entrada como consulta ---
 		if (state.consultCtx.active && pendingInput.trim()) {
@@ -223,7 +273,6 @@ export async function POST(req: Request) {
 				if (st?.type === 'ASK') {
 					followUp = st.data?.question || '';
 					state.justAskedFollowUp = Boolean(followUp);
-					message = [message, 'Perfecto, retomemos por donde quedamos.'].filter(Boolean).join('\n\n');
 				}
 			}
 			return NextResponse.json({ message, followUp: followUp || '', state });
@@ -234,10 +283,23 @@ export async function POST(req: Request) {
 		const consultMax = Number((coursePolicies as any)?.conversation?.maxTurns ?? 3);
 		state.consultCtx = state.consultCtx || { active: false, turns: 0 };
 		if (!isNoSeRegex.test(pendingInput) && (await isStudentAskingQuestionSem(pendingInput, (state as any).teacherProfile)) && !/\?\s*$/.test(pendingInput)) {
-			// Intención sin pregunta explícita → pedir la consulta
+			// Intención sin pregunta explícita → pedir la consulta (vía LLM)
 			state.consultCtx.active = true;
 			state.consultCtx.turns = 0;
-			message = '¿Cuál es tu consulta?';
+			try {
+				const recent = await getRecentHistory(sessionKey, 6);
+				const askC = await runFeedbackAgent({
+					language: 'es',
+					action: 'feedback',
+					stepType: 'ASK',
+					questionText: pendingInput,
+					objective: String(state.plan?.meta?.lesson_name || ''),
+					recentHistory: recent,
+					allowQuestions: true,
+					conversationMode: true
+				} as any);
+				message = (askC.message || '').trim();
+			} catch { message = ''; }
 			return NextResponse.json({ message, followUp: '', state });
 		}
 		
@@ -264,7 +326,6 @@ export async function POST(req: Request) {
 				if (st?.type === 'ASK') {
 					followUp = st.data?.question || '';
 					state.justAskedFollowUp = Boolean(followUp);
-					message = [message, 'Perfecto, retomemos por donde quedamos.'].filter(Boolean).join('\n\n');
 				}
 			}
 			return NextResponse.json({ message, followUp: followUp || '', state });
@@ -277,7 +338,7 @@ export async function POST(req: Request) {
 			const st = currentStep(state);
 			if (st?.type === 'ASK') {
 				const q = st.data?.question || '';
-				message = 'Perfecto, retomemos por donde quedamos.';
+				message = '';
 				followUp = q;
 				state.justAskedFollowUp = Boolean(followUp);
 				return NextResponse.json({ message, followUp, state });

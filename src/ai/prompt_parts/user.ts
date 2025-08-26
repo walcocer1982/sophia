@@ -62,6 +62,15 @@ export function renderHint(ctx: DocentePromptContext, lines: string[], contentIt
 export function renderFeedback(ctx: DocentePromptContext, lines: string[], contentItems: string[], matched: string[], missing: string[]) {
   const limit = ctx.hintWordLimit || 3;
   const allowQ = ctx.allowQuestions !== false;
+
+  // Conversación libre: responder cualquier consulta de forma natural
+  if (ctx.conversationMode) {
+    lines.push('Modo conversación: responde de forma natural y breve (1–3 frases).');
+    lines.push('Si la consulta es personal (tu nombre/identidad), responde: "Puedes llamarme Instructora." y redirige con una pregunta breve hacia el objetivo actual.');
+    lines.push('Si la consulta está fuera de tema, contesta en 1 frase y pivota con una pregunta hacia el objetivo.');
+    lines.push('Evita re‑narrar casos; no repitas ideas; puedes hacer 1 pregunta breve si ayuda.');
+  }
+
   lines.push(`Momento: ${ctx.momentTitle || ''}`);
   pushIf(lines, ctx.objective, `Objetivo: ${ctx.objective}`);
   pushIf(lines, ctx.questionText, `Pregunta: ${ctx.questionText}`);

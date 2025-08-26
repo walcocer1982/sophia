@@ -32,6 +32,27 @@ export function isAffirmativeToResume(input: string, teacherProfile?: any): bool
   return synonyms.some(s => n.includes(s));
 }
 
+export function isGreetingInput(input: string): boolean {
+  const n = (input || '').toLowerCase().trim();
+  if (!n) return false;
+  const greetings = ['hola','buenas','buen día','buen dia','buenas tardes','buenas noches','hey','qué tal','que tal','saludos'];
+  return greetings.some(g => n === g || n.startsWith(g));
+}
+
+export function isPersonalInfoQuery(input: string): boolean {
+  const n = (input || '').toLowerCase();
+  if (!n) return false;
+  const patterns = [
+    /tu\s+nombre/,
+    /c[oó]mo\s+te\s+llamas?/,
+    /qui[eé]n\s+eres/,
+    /eres\s+humano/,
+    /qu[eé]\s+modelo/,
+    /qui[eé]n\s+te\s+(cre[oó]|program[oó])/,
+  ];
+  return patterns.some(rx => rx.test(n));
+}
+
 // Detección por embeddings (centro de intención de pregunta). Mantiene la versión síncrona como atajo.
 import { buildAskIndex, semanticScore } from '@/engine/semvec';
 
