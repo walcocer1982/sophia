@@ -2,13 +2,14 @@ import { getClient, pickModel } from '@/lib/ai';
 import type { DocentePromptContext } from './prompt_parts/types';
 import { buildSystemPrompt, buildUserPrompt } from './prompt';
 import { guardAdvanceOutput, guardFeedbackOutput, guardHintOutput } from './outputGuardrails';
+import { trace } from './tracing';
 
 function stripQuestions(text?: string): string {
   const raw = (text || '').trim();
   if (!raw) return '';
   // Quita oraciones que terminen en ? o ¿ a nivel de frase, manteniendo el resto
   const sentences = raw.split(/(?<=[\.!?¿])\s+/).filter(Boolean);
-  return sentences.filter(s => !/[?¿]\s*$/.test(s.trim())).join(' ');
+  return sentences.filter(s => /[?¿]\s*$/.test(s.trim()) === false).join(' ');
 }
 
 function lastQuestion(text?: string): string {
@@ -19,11 +20,11 @@ function lastQuestion(text?: string): string {
 
 function normalizeForMatch(s: string): string {
   return s
-    		.toLowerCase()
-		.normalize('NFD')
-		.replace(/[\u0300-\u036f]/g, '')
-		.replace(/\s+/g, ' ')
-		.trim();
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 // Anti re‑narración: elimina párrafos exactos presentes en el historial reciente
@@ -82,6 +83,7 @@ export async function runDocenteLLM(ctx: DocentePromptContext): Promise<{ messag
   let offline = false;
   let out = '';
   try {
+    trace({ name: 'llm.call', timestamp: Date.now(), props: { action: ctx.action, model } });
     const client = getClient();
     const r = await client.responses.create({
       model,
@@ -92,8 +94,10 @@ export async function runDocenteLLM(ctx: DocentePromptContext): Promise<{ messag
       temperature: 0.30,
     });
     out = ((r as any).output_text || '').trim();
+    trace({ name: 'llm.ok', timestamp: Date.now(), props: { action: ctx.action, chars: out.length } });
   } catch {
     offline = true;
+    trace({ name: 'llm.offline', timestamp: Date.now(), props: { action: ctx.action } });
   }
 
   if (!offline) {
@@ -117,13 +121,17 @@ export async function runDocenteLLM(ctx: DocentePromptContext): Promise<{ messag
         const m = raw.match(/PUENTE\s*:\s*(.+)$/im);
         if (m) {
           const bridge = stripSelfDuplicates(stripQuestions(m[1] || '').trim());
-          return { message: guardAdvanceOutput(ctx, bridge) };
+          const guarded = guardAdvanceOutput(ctx, bridge);
+          trace({ name: 'llm.out.advance', timestamp: Date.now(), props: { chars: guarded.length } });
+          return { message: guarded };
         }
       }
       let msg = stripQuestions(raw);
       msg = stripRepeatedFromHistory(msg, ctx);
       msg = stripSelfDuplicates(msg);
-      return { message: guardAdvanceOutput(ctx, msg) };
+      const guarded = guardAdvanceOutput(ctx, msg);
+      trace({ name: 'llm.out.advance', timestamp: Date.now(), props: { chars: guarded.length } });
+      return { message: guarded };
     }
     if (ctx.action === 'hint') {
       let raw = out.replace(/^\s*Docente\s*:\s*/i, '').trim();
@@ -137,23 +145,31 @@ export async function runDocenteLLM(ctx: DocentePromptContext): Promise<{ messag
         // Quitar prefijos redundantes como "Te doy una pista:" si vinieran del modelo
         hint = hint.replace(/^te\s+doy\s+una\s+pista\s*:\s*/i, '').trim();
         const cleaned = stripSelfDuplicates(stripRepeatedFromHistory(stripQuestions(hint), ctx));
-        return guardHintOutput(ctx, { message: cleaned, followUp: fu });
+        const guarded = guardHintOutput(ctx, { message: cleaned, followUp: fu });
+        trace({ name: 'llm.out.hint', timestamp: Date.now(), props: { fuChars: (fu || '').length, msgChars: (guarded.message || '').length } });
+        return guarded;
       }
       // Fallback a lógica anterior si no hay etiquetas
       let msg = stripQuestions(raw).trim();
       msg = stripRepeatedFromHistory(msg, ctx);
       msg = stripSelfDuplicates(msg);
       const follow = lastQuestion(raw);
-      return guardHintOutput(ctx, { message: msg, followUp: follow });
+      const guarded = guardHintOutput(ctx, { message: msg, followUp: follow });
+      trace({ name: 'llm.out.hint', timestamp: Date.now(), props: { fuChars: (follow || '').length, msgChars: (guarded.message || '').length } });
+      return guarded;
     }
     if (ctx.action === 'ask_simple' || ctx.action === 'ask_options') {
       const msg = stripSelfDuplicates(stripRepeatedFromHistory(out.replace(/^\s*Docente\s*:\s*/i, '').trim(), ctx));
+      trace({ name: 'llm.out.ask', timestamp: Date.now(), props: { chars: msg.length, kind: ctx.action } });
       return { message: msg };
     }
     if (ctx.action === 'feedback') {
       const msg = stripSelfDuplicates(stripRepeatedFromHistory(out.replace(/^\s*Docente\s*:\s*/i, '').trim(), ctx));
-      return { message: guardFeedbackOutput(ctx, msg) };
+      const guarded = guardFeedbackOutput(ctx, msg);
+      trace({ name: 'llm.out.feedback', timestamp: Date.now(), props: { chars: guarded.length, kind: (ctx as any).kind } });
+      return { message: guarded };
     }
+    trace({ name: 'llm.out.raw', timestamp: Date.now(), props: { chars: out.length } });
     return { message: out };
   }
 

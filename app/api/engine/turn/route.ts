@@ -1,4 +1,5 @@
 import { runDocenteLLM } from '@/ai/orchestrator';
+import { runAdvanceAgent, runAskAgent, runAskOptionsAgent, runEndAgent, runExplainAgent, runFeedbackAgent, runHintAgent } from '@/ai/agents';
 import { isNoSeInput, shouldGateByMinTokens } from '@/engine/clarify';
 import { evaluateSemanticOnly, type AskPolicy } from '@/engine/eval';
 // import { extractKeywords } from '@/engine/hints';
@@ -15,6 +16,7 @@ import path from 'path';
 import { getHintWordLimit } from '@/ai/tools/PolicyTool';
 import { pickTwoOptions } from '@/ai/tools/OptionsTool';
 import { decideForceAdvanceByNoSe } from '@/ai/tools/InputGuardrail';
+import { pickVariant, varyHintLimit } from '@/ai/ab';
 
 
 // Evita repetir frases casi idénticas al componer mensajes
@@ -357,8 +359,9 @@ export async function POST(req: Request) {
               const askData: any = (act as any)?.step?.data || {};
               const recent = await getRecentHistory(sessionKey, 4);
               const sevIdx0 = Number(state.hintsByAskCode?.[stepCode] || 0);
-              const hintLimit0 = getHintWordLimit(coursePolicies, sevIdx0);
-              const llmHint = await runDocenteLLM({
+              let hintLimit0 = getHintWordLimit(coursePolicies, sevIdx0);
+              try { hintLimit0 = varyHintLimit(hintLimit0, pickVariant(sessionKey)); } catch {}
+              const llmHint = await runHintAgent({
                 language: 'es',
                 action: 'hint',
                 stepType: 'ASK',
@@ -821,8 +824,9 @@ export async function POST(req: Request) {
                 try {
                   const recent = await getRecentHistory(sessionKey, 4);
                   const sevIdx = Number(state.hintsByAskCode?.[stepCode] || 0);
-                  const hintLimit = getHintWordLimit(coursePolicies, sevIdx);
-                  const llmHint = await runDocenteLLM({
+                  let hintLimit = getHintWordLimit(coursePolicies, sevIdx);
+                  try { hintLimit = varyHintLimit(hintLimit, pickVariant(sessionKey)); } catch {}
+                  const llmHint = await runHintAgent({
                     language: 'es',
                     action: 'hint',
                     stepType: 'ASK',
@@ -985,8 +989,9 @@ export async function POST(req: Request) {
                 const missingArr = Array.isArray(cls.missing) ? cls.missing : [];
                   const recent = await getRecentHistory(sessionKey, 4);
                   const sevIdx3 = Number(state.hintsByAskCode?.[stepCode] || 0);
-                  const hintLimit3 = getHintWordLimit(coursePolicies, sevIdx3);
-                  const llmHint2 = await runDocenteLLM({
+                  let hintLimit3 = getHintWordLimit(coursePolicies, sevIdx3);
+                  try { hintLimit3 = varyHintLimit(hintLimit3, pickVariant(sessionKey)); } catch {}
+                  const llmHint2 = await runHintAgent({
                     language: 'es',
                     action: 'hint',
                     stepType: 'ASK',
