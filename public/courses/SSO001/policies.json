@@ -68,6 +68,12 @@
     "maxSentences": 3,
     "allowQuestions": true
   },
+  "conversation": {
+    "enabled": true,
+    "maxTurns": 3,
+    "consultPrompt": "¿Cuál es tu consulta?",
+    "resumeSynonyms": ["continuar","seguir","sigamos","retomar","reanudar","está claro","ahora entiendo","gracias"]
+  },
   "advance": {
     "allowForcedOn": ["SALUDO", "CONEXION", "ADQUISICION", "APLICACION", "DISCUSION", "REFLEXION", "OTRO"],
     "maxAttemptsBeforeForce": 3

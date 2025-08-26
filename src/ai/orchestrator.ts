@@ -7,9 +7,8 @@ import { trace } from './tracing';
 function stripQuestions(text?: string): string {
   const raw = (text || '').trim();
   if (!raw) return '';
-  // Quita oraciones que terminen en ? o ¿ a nivel de frase, manteniendo el resto
   const sentences = raw.split(/(?<=[\.!?¿])\s+/).filter(Boolean);
-  return sentences.filter(s => /[?¿]\s*$/.test(s.trim()) === false).join(' ');
+  return sentences.filter(s => !/[?¿]\s*$/.test(s.trim())).join(' ');
 }
 
 function lastQuestion(text?: string): string {
@@ -42,7 +41,7 @@ function stripRepeatedFromHistory(text: string, ctx: DocentePromptContext): stri
   return kept.join('\n\n').trim();
 }
 
-// Antiduplicación interna: elimina oraciones repetidas dentro del mismo mensaje
+// Antiduplicación interna
 function stripSelfDuplicates(text: string): string {
   const raw = (text || '').trim();
   if (!raw) return '';
@@ -80,10 +79,11 @@ export async function runDocenteLLM(ctx: DocentePromptContext): Promise<{ messag
   const system = buildSystemPrompt(ctx);
   const user = buildUserPrompt(ctx);
   const model = pickModel('cheap');
+  const temp = ctx.conversationMode ? 0.4 : 0.3;
   let offline = false;
   let out = '';
   try {
-    trace({ name: 'llm.call', timestamp: Date.now(), props: { action: ctx.action, model } });
+    trace({ name: 'llm.call', timestamp: Date.now(), props: { action: ctx.action, model, temp } });
     const client = getClient();
     const r = await client.responses.create({
       model,
@@ -91,7 +91,7 @@ export async function runDocenteLLM(ctx: DocentePromptContext): Promise<{ messag
         { role: 'system', content: system },
         { role: 'user', content: user },
       ],
-      temperature: 0.30,
+      temperature: temp,
     });
     out = ((r as any).output_text || '').trim();
     trace({ name: 'llm.ok', timestamp: Date.now(), props: { action: ctx.action, chars: out.length } });
@@ -106,7 +106,7 @@ export async function runDocenteLLM(ctx: DocentePromptContext): Promise<{ messag
     }
     if (ctx.action === 'ask') {
       const q = (ctx.questionText || '').trim();
-      let msg = stripQuestions(out).replace(/^\s*Docente\s*:\s*/i, '').trim();
+      let msg = (ctx.conversationMode ? out : stripQuestions(out)).replace(/^\s*Docente\s*:\s*/i, '').trim();
       msg = stripRepeatedFromHistory(msg, ctx);
       msg = stripSelfDuplicates(msg);
       const norm = (s: string) => s.replace(/\s+/g, ' ').toLowerCase();
@@ -116,7 +116,6 @@ export async function runDocenteLLM(ctx: DocentePromptContext): Promise<{ messag
     }
     if (ctx.action === 'ok' || ctx.action === 'advance') {
       let raw = out.replace(/^\s*Docente\s*:\s*/i, '').trim();
-      // Intentar parsear PUENTE: en advance
       if (ctx.action === 'advance') {
         const m = raw.match(/PUENTE\s*:\s*(.+)$/im);
         if (m) {
@@ -135,21 +134,18 @@ export async function runDocenteLLM(ctx: DocentePromptContext): Promise<{ messag
     }
     if (ctx.action === 'hint') {
       let raw = out.replace(/^\s*Docente\s*:\s*/i, '').trim();
-      // Parse labels: MICRO / PISTA
       const microMatch = raw.match(/^\s*MICRO\s*:\s*(.+)$/im);
       const pistaMatch = raw.match(/^\s*PISTA\s*:\s*(.+)$/im);
       if (microMatch || pistaMatch) {
         const fuLines = (microMatch?.[1] || '').split(/\n+/).map(s => s.trim()).filter(Boolean);
         const fu = (fuLines[0] || '').trim();
         let hint = (pistaMatch?.[1] || '').trim();
-        // Quitar prefijos redundantes como "Te doy una pista:" si vinieran del modelo
         hint = hint.replace(/^te\s+doy\s+una\s+pista\s*:\s*/i, '').trim();
         const cleaned = stripSelfDuplicates(stripRepeatedFromHistory(stripQuestions(hint), ctx));
         const guarded = guardHintOutput(ctx, { message: cleaned, followUp: fu });
         trace({ name: 'llm.out.hint', timestamp: Date.now(), props: { fuChars: (fu || '').length, msgChars: (guarded.message || '').length } });
         return guarded;
       }
-      // Fallback a lógica anterior si no hay etiquetas
       let msg = stripQuestions(raw).trim();
       msg = stripRepeatedFromHistory(msg, ctx);
       msg = stripSelfDuplicates(msg);
@@ -164,8 +160,10 @@ export async function runDocenteLLM(ctx: DocentePromptContext): Promise<{ messag
       return { message: msg };
     }
     if (ctx.action === 'feedback') {
-      const msg = stripSelfDuplicates(stripRepeatedFromHistory(out.replace(/^\s*Docente\s*:\s*/i, '').trim(), ctx));
-      const guarded = guardFeedbackOutput(ctx, msg);
+      let raw = out.replace(/^\s*Docente\s*:\s*/i, '').trim();
+      let msg = ctx.conversationMode ? raw : stripQuestions(raw);
+      msg = stripSelfDuplicates(stripRepeatedFromHistory(msg, ctx));
+      const guarded = guardFeedbackOutput({ ...ctx, allowQuestions: ctx.allowQuestions }, msg);
       trace({ name: 'llm.out.feedback', timestamp: Date.now(), props: { chars: guarded.length, kind: (ctx as any).kind } });
       return { message: guarded };
     }
@@ -173,7 +171,6 @@ export async function runDocenteLLM(ctx: DocentePromptContext): Promise<{ messag
     return { message: out };
   }
 
-  // Offline fallback determinista (sin OpenAI)
   const q = (ctx.questionText || '').trim();
   if (ctx.action === 'explain') {
     const parts = [

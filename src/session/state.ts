@@ -37,6 +37,8 @@ export type SessionState = {
 	// Contexto de consultas para pausar/retomar
 	consultCtx?: {
 		pausedAt?: { momentIndex: number; stepIndex: number };
+		active?: boolean;
+		turns?: number;
 	};
 	lastFollowUpText?: string;
 };

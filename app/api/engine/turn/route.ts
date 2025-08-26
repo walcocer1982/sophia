@@ -200,60 +200,88 @@ export async function POST(req: Request) {
 			});
 		}
 		
-		// 1) Si el alumno pide "permiso" para preguntar (detección semántica de intención)
-		const isNoSeRegex = /^\s*(no\s*(lo\s*)?s[eé]|no\s*est[oó]y?\s*seguro|no\s*s[eé]\s*bien)\s*$/i;
-		if (!isNoSeRegex.test(pendingInput) && (await isStudentAskingQuestionSem(pendingInput, (state as any).teacherProfile)) && /\?\s*$/.test(pendingInput)) {
-			message = '¡Claro! Dime cuál es tu consulta y, cuando quede claro, me lo confirmas para continuar con la clase.';
-			// "pausa": recuerda dónde estás para retomar
-			state.consultCtx.pausedAt = { momentIndex: state.momentIdx!, stepIndex: state.stepIdx! };
-			// Debug log
-			if (process.env.ENGINE_DEBUG === 'true') {
-				console.log('[CONSULTA_INTENCION]', { pausedAt: state.consultCtx.pausedAt });
-			}
-			// No avances el plan ni evalúes; solo responde
-			return NextResponse.json({ message, followUp: '', state });
-		}
-		
-		// 2) Si trae una pregunta concreta (termina en ?)
-		if (!isNoSeRegex.test(pendingInput) && (await isStudentAskingQuestionSem(pendingInput, (state as any).teacherProfile)) && /\?\s*$/.test(pendingInput)) {
+		// --- CONSULTA ACTIVA: si ya estamos en modo consulta, responder cualquier entrada como consulta ---
+		if (state.consultCtx.active && pendingInput.trim()) {
 			const recent = await getRecentHistory(sessionKey, 6);
-			const qa = await runDocenteLLM({
+			const qa = await runFeedbackAgent({
 				language: 'es',
 				action: 'feedback',
 				stepType: 'ASK',
 				questionText: pendingInput,
 				objective: String(state.plan?.meta?.lesson_name || ''),
-				recentHistory: recent
-			});
+				recentHistory: recent,
+				allowQuestions: true,
+				conversationMode: true
+			} as any);
 			message = (qa.message || '').trim();
-			// pides confirmación para retomar
-			const tail = '\n\n¿Te quedó claro? Responde "sí" para continuar o formula otra pregunta.';
-			// Debug log
-			if (process.env.ENGINE_DEBUG === 'true') {
-				console.log('[CONSULTA_QA]', { len: message.length });
+			state.consultCtx.turns = Number(state.consultCtx.turns || 0) + 1;
+			const consultMax2 = Number((coursePolicies as any)?.conversation?.maxTurns ?? 3);
+			if (state.consultCtx.turns >= consultMax2) {
+				state.consultCtx.active = false;
+				state.consultCtx.turns = 0;
+				const st = currentStep(state);
+				if (st?.type === 'ASK') {
+					followUp = st.data?.question || '';
+					state.justAskedFollowUp = Boolean(followUp);
+					message = [message, 'Perfecto, retomemos por donde quedamos.'].filter(Boolean).join('\n\n');
+				}
 			}
-			return NextResponse.json({ message: message + tail, followUp: '', state });
+			return NextResponse.json({ message, followUp: followUp || '', state });
 		}
 		
-		// 3) Si el alumno confirma que ya entendió, retomas donde quedó
-		if (state.consultCtx.pausedAt && isAffirmativeToResume(pendingInput, (state as any).teacherProfile)) {
-			// Debug log
-			if (process.env.ENGINE_DEBUG === 'true') {
-				console.log('[CONSULTA_RESUME]', { resumedFrom: state.consultCtx.pausedAt });
+		// 1) Si el alumno pide "permiso" para preguntar (detección semántica de intención)
+		const isNoSeRegex = /^\s*(no\s*(lo\s*)?s[eé]|no\s*est[oó]y?\s*seguro|no\s*s[eé]\s*bien)\s*$/i;
+		const consultMax = Number((coursePolicies as any)?.conversation?.maxTurns ?? 3);
+		state.consultCtx = state.consultCtx || { active: false, turns: 0 };
+		if (!isNoSeRegex.test(pendingInput) && (await isStudentAskingQuestionSem(pendingInput, (state as any).teacherProfile)) && !/\?\s*$/.test(pendingInput)) {
+			// Intención sin pregunta explícita → pedir la consulta
+			state.consultCtx.active = true;
+			state.consultCtx.turns = 0;
+			message = '¿Cuál es tu consulta?';
+			return NextResponse.json({ message, followUp: '', state });
+		}
+		
+		// 2) Si trae una pregunta concreta (termina en ?)
+		if (!isNoSeRegex.test(pendingInput) && /\?\s*$/.test(pendingInput)) {
+			state.consultCtx.active = true;
+			state.consultCtx.turns = Number(state.consultCtx.turns || 0) + 1;
+			const recent = await getRecentHistory(sessionKey, 6);
+			const qa = await runFeedbackAgent({
+				language: 'es',
+				action: 'feedback',
+				stepType: 'ASK',
+				questionText: pendingInput,
+				objective: String(state.plan?.meta?.lesson_name || ''),
+				recentHistory: recent,
+				allowQuestions: true,
+				conversationMode: true
+			} as any);
+			message = (qa.message || '').trim();
+			if (state.consultCtx.turns >= consultMax) {
+				state.consultCtx.active = false;
+				state.consultCtx.turns = 0;
+				const st = currentStep(state);
+				if (st?.type === 'ASK') {
+					followUp = st.data?.question || '';
+					state.justAskedFollowUp = Boolean(followUp);
+					message = [message, 'Perfecto, retomemos por donde quedamos.'].filter(Boolean).join('\n\n');
+				}
 			}
-			// Limpiar contexto de pausa
-			state.consultCtx.pausedAt = undefined;
-			
-			// Si estamos sobre una ASK, re-emitirla ya
+			return NextResponse.json({ message, followUp: followUp || '', state });
+		}
+
+		// 3) Si el alumno confirma que ya entendió, retomas donde quedó, incluyendo señales conversacionales
+		if (state.consultCtx.active && isAffirmativeToResume(pendingInput, (state as any).teacherProfile)) {
+			state.consultCtx.active = false;
+			state.consultCtx.turns = 0;
 			const st = currentStep(state);
 			if (st?.type === 'ASK') {
 				const q = st.data?.question || '';
-				message = 'Perfecto, retomemos.';
+				message = 'Perfecto, retomemos por donde quedamos.';
 				followUp = q;
 				state.justAskedFollowUp = Boolean(followUp);
 				return NextResponse.json({ message, followUp, state });
 			}
-			// Si no es ASK, continúa flujo normal
 		}
 		
 		// Bucle: saltar SKIP consecutivos y construir salida adecuada

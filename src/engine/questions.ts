@@ -27,7 +27,9 @@ export function isAffirmativeToResume(input: string, teacherProfile?: any): bool
   const ok = Array.isArray(teacherProfile?.questions?.resumeAffirmatives)
     ? teacherProfile.questions.resumeAffirmatives
     : ['sí','si','ok','listo','entendido','claro','ya'];
-  return ok.includes(n) || /^si[,\.!\s]?/i.test(input||'');
+  if (ok.includes(n) || /^si[,\.!?\s]?/i.test(input||'')) return true;
+  const synonyms = ['continuar','seguir','sigamos','seguimos','retomar','reanudar','proseguir','volver'];
+  return synonyms.some(s => n.includes(s));
 }
 
 // Detección por embeddings (centro de intención de pregunta). Mantiene la versión síncrona como atajo.

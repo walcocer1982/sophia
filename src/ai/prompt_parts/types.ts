@@ -33,6 +33,8 @@ export type DocentePromptContext = {
   attempts?: number;
   hintsUsed?: number;
   aptitudes?: TeacherAptitudes;
+  teacherAptitudes?: string[];
+  conversationMode?: boolean;
 };
 
 

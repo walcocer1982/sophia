@@ -75,9 +75,9 @@ Entregable: observabilidad completa y bucle de mejora continua
 Entregable: experiencia de voz con calidad pedagógica preservada
 
 ### Fase 6 — Consolidación y limpieza
-- Deprecación de lógicas duplicadas en `orchestrator`
-- Documentación de contratos de Tools y guardrails
-- Ajustes finales de políticas y aptitudes
+- Deprecación de lógicas duplicadas en `orchestrator` (uso de sub‑agentes)
+- Documentación de contratos de Tools y guardrails (ver `docs/AGENTS_CONTRACTS.md`)
+- Ajustes finales de políticas y aptitudes (perfil docente extendible)
 
 ---
 

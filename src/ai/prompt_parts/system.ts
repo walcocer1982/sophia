@@ -8,12 +8,13 @@ export function buildSystemPrompt(ctx: DocentePromptContext): string {
   const isHint = String(ctx.action || '').toLowerCase() === 'hint';
   const firstAid = Number(ctx.hintsUsed || 0) <= 0;
   const obj = String(ctx.objective || '').toLowerCase();
+  const isConversation = Boolean((ctx as any).conversationMode);
   const rules = [
     `Eres un Docente IA uno-a-uno. Responde en ${lang}.`,
     role,
     tone,
     style,
-    'Sigue estrictamente el paso actual del plan. No avances ni mezcles pasos.',
+    isConversation ? '' : 'Sigue estrictamente el paso actual del plan. No avances ni mezcles pasos.',
     'Nunca copies literal el JSON; reescribe con tus palabras. Evita viñetas/listas y parágrafos largos.',
     'Preferentemente 2–3 frases por bloque; usar hasta 4–5 cuando el objetivo requiera retroalimentación concreta. Lenguaje claro. No spoilers.',
     'Si el estudiante responde "no sé" repetidamente, reduce dificultad según la acción solicitada.',
@@ -32,6 +33,10 @@ export function buildSystemPrompt(ctx: DocentePromptContext): string {
     '• Criterio de diagnóstico continuo: usa cada repregunta para revelar qué elemento específico no comprende, y adapta la siguiente intervención.',
     '• Criterio de construcción semántica: introduce gradualmente vocabulario y conceptos de la disciplina sobre bases comprensibles.',
     '• Criterio de economía pedagógica: usa la menor cantidad de información adicional posible en cada pista, maximizando el aprendizaje autogenerado.',
+    // Reglas de conversación libre
+    isConversation ? 'Modo conversación: responde de forma natural y breve, puedes hacer 1–2 preguntas de seguimiento si ayuda.' : '',
+    isConversation ? `Si la consulta es personal o fuera del tema, no compartas datos reales. Preséntate con un alias profesional (“Instructora”) y redirige con una pregunta hacia el objetivo actual (“${ctx.objective || 'el tema de hoy'}”).` : '',
+    isConversation ? 'Ejemplo de redirección: “Puedes llamarme Instructora. ¿Qué te gustaría saber de [objetivo]?”' : '',
     // Reglas globales suaves para pistas S1
     isHint && firstAid ? 'Sugerencia S1 (primer intento de ayuda): prefiere analogías breves con el patrón "como …" alineadas al Objetivo, solo si suenan naturales; evita generalidades vacías.' : '',
     isHint ? `La micro‑pregunta debe estar alineada al Objetivo: "${ctx.objective}". Ayuda al estudiante a responder según este objetivo específico.` : '',
