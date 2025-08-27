@@ -25,6 +25,7 @@ export default function EngineChatLayout({
   const [inputValue, setInputValue] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const stickRef = useRef<boolean>(true);
   const [mediaIdx, setMediaIdx] = useState<number>(0);
@@ -32,16 +33,80 @@ export default function EngineChatLayout({
   const mediaImages: string[] = useMemo(() => {
     try {
       const stepCode: string | undefined = (state as any)?.stepCode || (state as any)?.state?.stepCode;
-      const images = (vm as any)?.media?.[stepCode || '']?.images;
+      const entry = (vm as any)?.media?.[stepCode || ''] || {};
+      const images = entry?.images;
       return Array.isArray(images) ? images.filter(Boolean) : [];
     } catch { return []; }
   }, [vm, state]);
 
+  type MediaItem = { url: string; name?: string; description?: string; caption?: string };
+  const deriveNameFromUrl = (u?: string): string => {
+    try {
+      if (!u) return '';
+      const last = u.split('?')[0].split('#')[0].split('/').pop() || '';
+      const base = last.replace(/\.[a-zA-Z0-9]+$/, '');
+      return base.replace(/[\-_]+/g, ' ');
+    } catch { return ''; }
+  };
+  const currentMultimedia: MediaItem[] = useMemo(() => {
+    try {
+      const stepCode: string | undefined = (state as any)?.stepCode || (state as any)?.state?.stepCode;
+      const entry = (vm as any)?.media?.[stepCode || ''] || {};
+      const baseRaw = Array.isArray(entry?.items) ? entry.items : [];
+      const hintRaw = Array.isArray(entry?.hintItems) ? entry.hintItems : [];
+      if (baseRaw.length || hintRaw.length) {
+        const mapIt = (it: any) => ({
+          url: it?.url || it?.src || it?.image || '',
+          name: it?.name || it?.title || deriveNameFromUrl(it?.url || it?.src || it?.image),
+          description: it?.description || it?.desc || '',
+          caption: it?.caption || it?.label || ''
+        });
+        return [...baseRaw.map(mapIt), ...hintRaw.map(mapIt)].filter((it: MediaItem) => !!it.url);
+      }
+      const imgs = mediaImages;
+      return imgs.map((url) => ({ url, name: deriveNameFromUrl(url), caption: deriveNameFromUrl(url) }));
+    } catch { return mediaImages.map((url) => ({ url, name: deriveNameFromUrl(url), caption: deriveNameFromUrl(url) })); }
+  }, [vm, state, mediaImages]);
+
+  // Limitar elementos visibles según progreso de hints (si viene del engine)
+  const visibleMultimedia: MediaItem[] = useMemo(() => {
+    try {
+      const stepCode: string | undefined = (state as any)?.stepCode || (state as any)?.state?.stepCode;
+      const entry = (vm as any)?.media?.[stepCode || ''] || {};
+      const baseRaw = Array.isArray(entry?.items) ? entry.items : [];
+      const hintRaw = Array.isArray(entry?.hintItems) ? entry.hintItems : [];
+      const hintsUsed = Number((state as any)?.hintsUsed || 0);
+      if (baseRaw.length || hintRaw.length) {
+        const mapIt = (it: any) => ({
+          url: it?.url || it?.src || it?.image || '',
+          name: it?.name || it?.title || deriveNameFromUrl(it?.url || it?.src || it?.image),
+          description: it?.description || it?.desc || '',
+          caption: it?.caption || it?.label || ''
+        });
+        const base = baseRaw.map(mapIt).filter((it: MediaItem) => !!it.url);
+        const hintAll = hintRaw.map(mapIt).filter((it: MediaItem) => !!it.url);
+        const unlocked = hintAll.slice(0, Math.max(0, Math.min(hintsUsed, hintAll.length)));
+        return [...base, ...unlocked];
+      }
+      // Sin esquema base/hints -> fallback progresivo simple
+      const maxHints = Math.max(1, Number((state as any)?.maxHints || 3));
+      const cap = Math.min(currentMultimedia.length, Math.max(1, hintsUsed + 1));
+      return currentMultimedia.slice(0, cap);
+    } catch { return currentMultimedia; }
+  }, [vm, state, currentMultimedia]);
+
   useEffect(() => { setMediaIdx(0); }, [mediaImages?.length]);
 
   useEffect(() => {
-    if (stickRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!stickRef.current) return;
+    const sc = messagesScrollRef.current;
+    if (sc) {
+      try {
+        sc.scrollTo({ top: sc.scrollHeight, behavior: 'smooth' });
+      } catch {
+        // fallback
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
     }
   }, [messages, isTyping]);
 
@@ -64,7 +129,7 @@ export default function EngineChatLayout({
   };
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="h-screen bg-slate-100 overflow-hidden flex flex-col">
       {/* Header */}
       <header className="bg-white border-b border-slate-200 px-4 md:px-6 py-3 md:py-4 sticky top-0 z-40">
         <div className="flex items-center justify-between">
@@ -81,10 +146,10 @@ export default function EngineChatLayout({
         </div>
       </header>
 
-      <div className="flex h-[calc(100vh-72px)] max-w-screen-2xl mx-auto">
+      <div className="flex-1 flex w-full overflow-hidden min-h-0">
         {/* Left side: Panel informativo (Aprendizaje esperado, Puntos clave y Progreso) */}
-        <div className={`hidden lg:block transition-all duration-300 pl-3 ${sidebarOpen ? 'lg:basis-[22%] xl:basis-[22%] opacity-100' : 'lg:basis-0 opacity-0 pointer-events-none'} min-w-[240px]`}>
-          <div className={`h-full m-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col bg-white transition-all duration-300 ${sidebarOpen ? 'scale-100' : 'scale-95'}`}>
+        <div className={`hidden lg:block transition-all duration-300 pl-2 ${sidebarOpen ? 'lg:basis-[20%] xl:basis-[20%] opacity-100' : 'lg:basis-0 opacity-0 pointer-events-none'} min-w-[220px]`}>
+          <div className={`h-full mx-3 my-0 rounded-2xl shadow-sm border border-slate-200 flex flex-col bg-white transition-all duration-300 ${sidebarOpen ? 'scale-100' : 'scale-95'}`}>
             <div className="px-6 py-4 border-b border-slate-200">
               <h3 className="font-semibold text-slate-900 flex items-center gap-2">
                 <span className="inline-block w-2 h-2 rounded-full bg-blue-600" />
@@ -139,8 +204,21 @@ export default function EngineChatLayout({
                       <h4 className="text-xs font-medium text-slate-700 mb-2">Momentos</h4>
                       <div className="space-y-2">
                         {vm.moments.map((m: any, i: number) => (
-                          <div key={`${m.title}-${i}`} className={`flex items-center gap-2 text-xs ${i < state.momentIdx ? 'text-green-700' : (i === state.momentIdx ? 'text-blue-700' : 'text-slate-500')}`}>
-                            <span className={`w-2 h-2 rounded-full ${i < state.momentIdx ? 'bg-green-600' : (i === state.momentIdx ? 'bg-blue-600' : 'bg-slate-300')}`} />
+                          <div
+                            key={`${m.title}-${i}`}
+                            className={`flex items-center gap-3 text-xs p-3 rounded-xl border transition-all duration-200 ${
+                              i === state.momentIdx
+                                ? 'bg-blue-50 border-blue-300 shadow-sm ring-2 ring-blue-200 text-blue-700'
+                                : i < state.momentIdx
+                                  ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-200 text-green-700'
+                                  : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-600'
+                            }`}
+                          >
+                            <span
+                              className={`w-2.5 h-2.5 rounded-full ${
+                                i < state.momentIdx ? 'bg-green-600' : (i === state.momentIdx ? 'bg-blue-600' : 'bg-slate-300')
+                              }`}
+                            />
                             <span className="truncate">{m.title}</span>
                           </div>
                         ))}
@@ -154,10 +232,10 @@ export default function EngineChatLayout({
         </div>
 
         {/* Main chat (centro, más ancho que multimedia) */}
-        <div className={`transition-all duration-300 w-full flex-1 min-w-[420px]`}>
-          <div className="h-full bg-white m-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
+        <div className={`transition-all duration-300 w-full flex-1 min-w-[420px] min-h-0`}>
+          <div className="h-full bg-white mx-3 my-0 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6" onScroll={onMessagesScroll}>
+            <div ref={messagesScrollRef} className="flex-1 overflow-y-auto p-6 space-y-6 min-h-0 pb-20 overscroll-contain" onScroll={onMessagesScroll}>
               {messages.map((m) => (
                 <div key={m.id} className={`flex items-start space-x-4 ${m.sender === 'student' ? 'flex-row-reverse space-x-reverse' : ''}`}>
                   {m.sender === 'ai' ? (
@@ -236,39 +314,58 @@ export default function EngineChatLayout({
         </div>
 
         {/* Right side: Contenido Multimedia */}
-        <div className={`hidden lg:block transition-all duration-300 ${sidebarOpen ? 'lg:basis-[42%] xl:basis-[44%]' : 'lg:basis-[42%] xl:basis-[44%]'} min-w-[360px]`}>
-          <div className="h-full bg-white m-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
+        <div className={`hidden lg:block transition-all duration-300 ${sidebarOpen ? 'lg:basis-[50%] xl:basis-[52%]' : 'lg:basis-[50%] xl:basis-[52%]'} min-w-[420px]`}>
+          <div className="h-full bg-white mx-3 my-0 rounded-2xl shadow-sm border border-slate-200 flex flex-col min-h-0">
             <div className="px-6 py-4 border-b border-slate-200">
               <h3 className="font-semibold text-slate-900">Contenido Multimedia</h3>
             </div>
-            <div className="flex-1 p-6">
-              {isTyping || !mediaImages?.length ? (
-                <div className="bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl text-slate-400 border border-slate-200 flex items-center justify-center aspect-video min-h-[180px]">
+            <div className="flex-1 p-6 min-h-0 overflow-y-auto overscroll-contain">
+              {isTyping || !currentMultimedia?.length ? (
+                <div className="bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl text-slate-400 border border-slate-200 flex items-center justify-center aspect-video min-h-[360px]">
                   <span className="text-xs">{isTyping ? 'Pensando…' : 'Sin contenido para este paso'}</span>
                 </div>
               ) : (
                 <>
                   <div className="relative rounded-xl overflow-hidden border border-slate-200 aspect-video bg-black/5">
-                    <Image
-                      src={mediaImages[Math.min(mediaIdx, mediaImages.length - 1)]}
+                    <img
+                      src={visibleMultimedia[Math.min(mediaIdx, Math.max(0, visibleMultimedia.length - 1))]?.url}
                       alt="Paso"
-                      fill
-                      sizes="(min-width: 1024px) 33vw, 100vw"
-                      className="object-cover"
+                      className="absolute inset-0 w-full h-full object-cover"
+                      loading="eager"
+                      fetchPriority="high"
                     />
                   </div>
-                  {mediaImages.length > 1 && (
-                    <div className="flex items-center gap-2 mt-3 justify-center">
-                      {mediaImages.map((_, i) => (
-                        <label key={`dot-${i}`} className="inline-flex items-center cursor-pointer">
+                  <div className="mt-3 text-sm text-slate-700 text-center">
+                    {(visibleMultimedia[Math.min(mediaIdx, Math.max(0, visibleMultimedia.length - 1))]?.caption
+                      || visibleMultimedia[Math.min(mediaIdx, Math.max(0, visibleMultimedia.length - 1))]?.description
+                      || visibleMultimedia[Math.min(mediaIdx, Math.max(0, visibleMultimedia.length - 1))]?.name
+                      || '')}
+                  </div>
+                  {visibleMultimedia.length > 0 && (
+                    <div className="flex flex-col space-y-2 mt-3">
+                      {visibleMultimedia.map((image, index) => (
+                        <label
+                          key={`mopt-${index}`}
+                          className={`flex items-center space-x-3 cursor-pointer p-3 rounded-xl border transition-all duration-200 ${
+                            mediaIdx === index
+                              ? 'bg-blue-50 border-blue-300 shadow-sm ring-2 ring-blue-200'
+                              : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                          }`}
+                        >
                           <input
                             type="radio"
-                            name="mediaIdx"
-                            className="sr-only"
-                            checked={mediaIdx === i}
-                            onChange={() => setMediaIdx(i)}
+                            name="imageSelector"
+                            checked={mediaIdx === index}
+                            onChange={() => setMediaIdx(index)}
+                            className={`w-4 h-4 focus:ring-2 focus:ring-blue-500 ${
+                              mediaIdx === index
+                                ? 'text-blue-600 bg-blue-600 border-blue-600'
+                                : 'text-blue-600 bg-white border-slate-300'
+                            }`}
                           />
-                          <span className={`w-2.5 h-2.5 rounded-full ${mediaIdx === i ? 'bg-blue-600' : 'bg-slate-300'}`} />
+                          <span className={`text-sm font-medium ${mediaIdx === index ? 'text-blue-700' : 'text-slate-700'}`}>
+                            {image?.caption || image?.name || `Imagen ${index + 1}`}
+                          </span>
                         </label>
                       ))}
                     </div>

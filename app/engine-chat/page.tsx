@@ -22,7 +22,7 @@ export default function EngineChatPage() {
   }, [registry, selectedCourseId, selectedLessonId]);
 
   const { messages, isTyping, done, sendMessage, clearMessages, adaptiveMode, setAdaptiveMode, budgetMetrics, state } = usePlanChat(planUrl || '/courses/SSO001/lessons/lesson02.json');
-  const showControls = process.env.NEXT_PUBLIC_ENGINE_CONTROLS !== 'false';
+  const showControls = false;
 
   useEffect(() => {
     let alive = true;
@@ -55,6 +55,16 @@ export default function EngineChatPage() {
         if (!res.ok) return;
         const plan = await res.json();
         if (!alive) return;
+        // Fusionar media del plan con documento externo en /public/media/{course}.json
+        let mergedMedia: any = plan?.media || {};
+        try {
+          const docUrl = selectedCourseId ? `/media/${selectedCourseId}.json` : '/media/SSO001.json';
+          const mRes = await fetch(`/api/media?planUrl=${encodeURIComponent(planUrl)}&docUrl=${encodeURIComponent(docUrl)}`);
+          if (mRes.ok) {
+            const mJson = await mRes.json();
+            mergedMedia = mJson?.media || mergedMedia;
+          }
+        } catch {}
         const moments = (plan.moments || []).map((m: any) => ({ title: m.title }));
         const keyPoints: Array<{ id: string; title: string; description?: string; completed?: boolean }> = [];
         const expectedLearning: string[] = [];
@@ -77,7 +87,7 @@ export default function EngineChatPage() {
           keyPoints,
           expectedLearning,
           avatarUrl: '/image/sophia_fuentes.png',
-          media: plan?.media || {}
+          media: mergedMedia
         });
       } catch {}
     })();
@@ -95,15 +105,21 @@ export default function EngineChatPage() {
       moments: lessonVM?.moments || [],
       keyPoints: lessonVM?.keyPoints || [],
       expectedLearning: lessonVM?.expectedLearning || [],
-      avatarUrl: lessonVM?.avatarUrl || '/image/sophia_fuentes.png'
+      avatarUrl: lessonVM?.avatarUrl || '/image/sophia_fuentes.png',
+      media: lessonVM?.media || {}
     } as any;
   }, [registry, selectedCourseId, selectedLessonId, lessonVM]);
 
-  const layoutState = useMemo(() => ({ momentIdx: state?.momentIdx || 0, stepCode: (state as any)?.stepCode }), [state?.momentIdx, (state as any)?.stepCode]);
+  const layoutState = useMemo(() => ({
+    momentIdx: state?.momentIdx || 0,
+    stepCode: (state as any)?.stepCode,
+    hintsUsed: (state as any)?.hintsUsed,
+    maxHints: (state as any)?.maxHints
+  }), [state?.momentIdx, (state as any)?.stepCode, (state as any)?.hintsUsed, (state as any)?.maxHints]);
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <div className="w-full px-2 md:px-4 py-4">
+    <div className="fixed inset-0 bg-slate-100 overflow-hidden">
+      <div className="w-full h-full min-h-0 px-0 pt-2 pb-0 flex flex-col overflow-hidden">
         {showControls && (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-4 flex flex-col md:flex-row gap-3">
             <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -166,16 +182,19 @@ export default function EngineChatPage() {
           </div>
         )}
 
-        <EngineChatLayout
-          messages={messages as any}
-          isTyping={isTyping}
-          onSend={(t) => sendMessage(t)}
-          vm={vm}
-          state={layoutState as any}
-        />
+        <div className="flex-1 overflow-hidden">
+          <EngineChatLayout
+            messages={messages as any}
+            isTyping={isTyping}
+            onSend={(t) => sendMessage(t)}
+            vm={vm}
+            state={layoutState as any}
+          />
+        </div>
       </div>
     </div>
   );
 }
+
 
 

@@ -833,9 +833,9 @@ export async function POST(req: Request) {
               }
             } catch {}
             
-            // Actualizar contadores
+            // Actualizar contadores: diferir incremento de hints
             if (cls.kind === 'HINT' || vague || isNo) {
-              hintsMap[stepCode] = (currentHints || 0) + 1;   // <— SIEMPRE suma
+              // El incremento real de hints se realiza solo cuando emitimos una pista más abajo
               lastActionMap[stepCode] = 'hint';
             }
             
@@ -960,7 +960,13 @@ export async function POST(req: Request) {
                 }
                 state.justAskedFollowUp = Boolean(followUp);
                 state.lastFollowUpText = followUp;
-                hintsMap[stepCode] = (hintsMap[stepCode] || 0) + 1;   // solo si emitimos hint
+                // Incrementar UNA sola pista por turno y por paso
+                (state as any).__hintBumpedForStep = (state as any).__hintBumpedForStep || {};
+                const bumped = Boolean((state as any).__hintBumpedForStep[stepCode]);
+                if (!bumped) {
+                  hintsMap[stepCode] = (hintsMap[stepCode] || 0) + 1;
+                  (state as any).__hintBumpedForStep[stepCode] = true;
+                }
               }
               dbg = { kind: cls.kind, matched: cls.matched?.slice(0,3) || [], missing: cls.missing?.slice(0,3) || [], nextAction: 'hint', stepCode };
               pendingInput = '';
@@ -1219,11 +1225,19 @@ export async function POST(req: Request) {
 			adaptiveMode: state.adaptiveMode || false
 		} : null;
 
+		// Enriquecer con hints usados para el paso actual y máximo desde políticas
+		let hintsUsedOut = 0;
+		try {
+			const currCode = (currentStep(state) as any)?.code;
+			hintsUsedOut = Number((state as any)?.hintsByAskCode?.[currCode || ''] || 0);
+		} catch {}
+		const maxHintsOut = Number((coursePolicies as any)?.hints?.maxHints ?? 3);
+
 		return NextResponse.json({ 
 			message, 
 			followUp, 
 			assessment,
-			state: { stepIdx: state.stepIdx, done: state.done },
+			state: { stepIdx: state.stepIdx, done: state.done, hintsUsed: hintsUsedOut, maxHints: maxHintsOut },
 			stepCode: (currentStep(state) as any)?.code || undefined,
 			momentIdx: state.momentIdx,
 			budgetMetrics 
