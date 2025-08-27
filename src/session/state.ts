@@ -41,6 +41,15 @@ export type SessionState = {
 		active?: boolean;
 		turns?: number;
 	};
+	// Historial de desvíos: consultas fuera del plan para luego retomar
+	diversionStack?: Array<{
+		fromMomentIndex: number;
+		fromStepIndex: number;
+		reason: 'GENERAL'|'PERSONAL'|'PLATFORM'|'OTHER';
+		query: string;
+		answerSummary?: string;
+		timestamp: number;
+	}>;
 	lastFollowUpText?: string;
   // RAG index construido desde la lección (guía)
   ragIndex?: RagIndex;
@@ -70,7 +79,8 @@ export function initSession(planUrl: string, plan: LessonPlan): SessionState {
 		budgetCentsLeft: 100, // 100 centavos = $1.00 por sesión
 		escalationsUsed: 0,
 		adaptiveMode: false, // Por defecto modo determinista
-		consultCtx: {} // Contexto de consultas
+		consultCtx: {}, // Contexto de consultas
+		diversionStack: []
 	};
 }
 

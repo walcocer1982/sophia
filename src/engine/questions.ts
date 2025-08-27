@@ -53,6 +53,29 @@ export function isPersonalInfoQuery(input: string): boolean {
   return patterns.some(rx => rx.test(n));
 }
 
+// Ayuda de plataforma: problemas de uso de la app/curso
+export function isPlatformHelpQuery(input: string): boolean {
+  const n = (input || '').toLowerCase();
+  if (!n) return false;
+  const pats = [
+    /no\s+(me\s+)?funciona/, /no\s+abre/, /no\s+carga/, /se\s+traba/, /error/,
+    /video|audio|sonido|micr[oó]fono|c[aá]mara/, /pantalla\s+completa/,
+    /plataforma|aplicaci[oó]n|app|curso|lecci[oó]n/, /login|contrase[nñ]a|acceso/,
+    /bot[oó]n|siguiente|atr[aá]s|continuar/
+  ];
+  return pats.some(rx => rx.test(n));
+}
+
+// Preguntas tipo conocimiento general (estilo enciclopédico)
+export function isGeneralKnowledgeStyleQuestion(input: string): boolean {
+  const n = (input || '').toLowerCase().trim();
+  if (!n) return false;
+  const pats = [
+    /qu[eé]\s+es\s+/, /qui[eé]n\s+es\s+/, /c[oó]mo\s+funciona\s+/, /d[oó]nde\s+/, /cu[aá]ndo\s+/, /por\s+qu[eé]\s+/, /definici[oó]n\s+de\s+/
+  ];
+  return pats.some(rx => rx.test(n)) || /\?\s*$/.test(n);
+}
+
 // Detección por embeddings (centro de intención de pregunta). Mantiene la versión síncrona como atajo.
 import { buildAskIndex, semanticScore } from '@/engine/semvec';
 

@@ -135,41 +135,48 @@ export default function EngineChatLayout({
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="bg-gradient-to-br from-blue-600 to-indigo-600 p-2.5 rounded-xl shadow-lg" />
-            <div>
-              <h1 className="text-lg md:text-xl font-bold text-slate-900">{vm?.title || 'DocenteIA'}</h1>
-              <p className="text-xs md:text-sm text-slate-600">Versión {vm?.version} · {vm?.locale}</p>
-            </div>
+                         <div>
+               <h1 className="text-base md:text-lg font-bold text-slate-900">{vm?.title || 'DocenteIA'}</h1>
+               <p className="text-[10px] md:text-xs text-slate-600">Versión {vm?.version} · {vm?.locale}</p>
+             </div>
           </div>
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors">
-            {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
         </div>
       </header>
 
       <div className="flex-1 flex w-full overflow-hidden min-h-0">
         {/* Left side: Panel informativo (Aprendizaje esperado, Puntos clave y Progreso) */}
-        <div className={`hidden lg:block transition-all duration-300 pl-2 ${sidebarOpen ? 'lg:basis-[20%] xl:basis-[20%] opacity-100' : 'lg:basis-0 opacity-0 pointer-events-none'} min-w-[220px]`}>
-          <div className={`h-full mx-3 my-0 rounded-2xl shadow-sm border border-slate-200 flex flex-col bg-white transition-all duration-300 ${sidebarOpen ? 'scale-100' : 'scale-95'}`}>
-            <div className="px-6 py-4 border-b border-slate-200">
-              <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-                <span className="inline-block w-2 h-2 rounded-full bg-blue-600" />
-                Resumen de la sesión
-              </h3>
-            </div>
-            <div className="p-6 space-y-4 overflow-y-auto">
+                 <div className={`hidden lg:block transition-all duration-300 pl-2 ${sidebarOpen ? 'lg:basis-[20%] xl:basis-[20%] opacity-100' : 'lg:basis-[90px] opacity-100'} ${sidebarOpen ? 'min-w-[220px]' : 'min-w-[90px]'}`}>
+           <div className={`h-full mx-3 my-0 rounded-2xl shadow-sm border border-slate-200 flex flex-col bg-white transition-all duration-300 relative ${sidebarOpen ? 'scale-100' : 'scale-95'}`}>
+             
+                           {/* Botón de toggle siempre visible */}
+              <button 
+                onClick={() => setSidebarOpen(!sidebarOpen)} 
+                className={`absolute top-4 z-10 p-2 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors ${sidebarOpen ? 'right-4' : 'left-1/2 transform -translate-x-1/2'}`}
+                style={{ top: '16px' }}
+              >
+                {sidebarOpen ? <Menu className="w-4 h-4 rotate-180" /> : <Menu className="w-4 h-4" />}
+              </button>
+             
+             <div className={`px-6 py-4 border-b border-slate-200 ${!sidebarOpen ? 'opacity-0' : 'opacity-100'}`}>
+               <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                 <span className="inline-block w-2 h-2 rounded-full bg-blue-600" />
+                 Resumen de la sesión
+               </h3>
+             </div>
+            <div className={`p-6 space-y-4 overflow-y-auto ${!sidebarOpen ? 'opacity-0' : 'opacity-100'}`}>
               {vm && state && (
                 <>
                   {Array.isArray(vm.expectedLearning) && vm.expectedLearning.length > 0 && (
                     <div>
-                      <h4 className="text-xs font-medium text-slate-700 mb-2 flex items-center gap-2">
-                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500" />
-                        Aprendizaje esperado
-                      </h4>
+                                             <h4 className="text-[10px] font-medium text-slate-700 mb-2 flex items-center gap-2">
+                         <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500" />
+                         Aprendizaje esperado
+                       </h4>
                       <div className="space-y-2">
                         {vm.expectedLearning.map((it: string, i: number) => (
-                          <div key={`el-${i}`} className="text-xs text-slate-800 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-lg px-3 py-2">
-                            {it}
-                          </div>
+                                                     <div key={`el-${i}`} className="text-[10px] text-slate-800 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-lg px-3 py-2">
+                             {it}
+                           </div>
                         ))}
                       </div>
                     </div>
@@ -177,36 +184,36 @@ export default function EngineChatLayout({
                   <div>
                     {vm.keyPoints && vm.keyPoints.length > 0 && (
                       <div>
-                        <h4 className="text-xs font-medium text-slate-700 mb-2 flex items-center gap-2">
-                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500" />
-                          Puntos clave
-                        </h4>
+                                                 <h4 className="text-[10px] font-medium text-slate-700 mb-2 flex items-center gap-2">
+                           <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500" />
+                           Puntos clave
+                         </h4>
                         <div className="space-y-2">
                           {vm.keyPoints.map((kp: any) => (
-                            <div key={kp.id} className={`p-3 rounded-lg border ${kp.completed ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-200' : 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100'}`}>
-                              <div className="text-xs font-medium text-slate-800">{kp.title}</div>
-                              {kp.description && <div className="text-[11px] text-slate-600 mt-1">{kp.description}</div>}
-                            </div>
+                                                         <div key={kp.id} className={`p-3 rounded-lg border ${kp.completed ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-200' : 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100'}`}>
+                               <div className="text-[10px] font-medium text-slate-800">{kp.title}</div>
+                               {kp.description && <div className="text-[9px] text-slate-600 mt-1">{kp.description}</div>}
+                             </div>
                           ))}
                         </div>
                       </div>
                     )}
                   </div>
                   <div className="pt-2 border-t border-slate-200">
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-slate-600">Momento</span>
-                      <span className="font-medium text-slate-900">{vm.moments.length > 0 ? Math.min(state.momentIdx + 1, vm.moments.length) : 0}/{vm.moments.length}</span>
-                    </div>
+                                         <div className="flex justify-between text-xs mb-1">
+                       <span className="text-slate-600">Momento</span>
+                       <span className="font-medium text-slate-900">{vm.moments.length > 0 ? Math.min(state.momentIdx + 1, vm.moments.length) : 0}/{vm.moments.length}</span>
+                     </div>
                     <div className="w-full bg-slate-100 rounded-full h-2">
                       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 h-2 rounded-full transition-all" style={{ width: `${Math.round(((vm.moments.length > 0 ? Math.min(state.momentIdx + 1, vm.moments.length) : 0) / Math.max(1, vm.moments.length)) * 100)}%` }} />
                     </div>
-                    <div className="mt-3">
-                      <h4 className="text-xs font-medium text-slate-700 mb-2">Momentos</h4>
+                                         <div className="mt-3">
+                       <h4 className="text-[10px] font-medium text-slate-700 mb-2">Momentos</h4>
                       <div className="space-y-2">
                         {vm.moments.map((m: any, i: number) => (
-                          <div
-                            key={`${m.title}-${i}`}
-                            className={`flex items-center gap-3 text-xs p-3 rounded-xl border transition-all duration-200 ${
+                                                     <div
+                             key={`${m.title}-${i}`}
+                             className={`flex items-center gap-3 text-[10px] p-3 rounded-xl border transition-all duration-200 ${
                               i === state.momentIdx
                                 ? 'bg-blue-50 border-blue-300 shadow-sm ring-2 ring-blue-200 text-blue-700'
                                 : i < state.momentIdx
@@ -258,11 +265,11 @@ export default function EngineChatLayout({
                   )}
                   <div className={`flex-1 ${m.sender === 'student' ? 'text-right' : ''}`}>
                     <div className={`inline-block px-5 py-3 rounded-2xl shadow-sm max-w-[70ch] ${m.sender === 'student' ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white' : 'bg-white border border-slate-200 text-slate-900'}`}>
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{m.content}</p>
+                      <p className="text-xs leading-relaxed whitespace-pre-wrap">{m.content}</p>
                     </div>
                     <div className={`mt-2 flex items-center space-x-2 ${m.sender === 'student' ? 'justify-end' : 'justify-start'}`}>
                       <Clock className="w-3 h-3 text-slate-400" />
-                      <span className="text-xs text-slate-500">{m.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span className="text-[10px] text-slate-500">{m.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
                   </div>
                 </div>
@@ -314,10 +321,10 @@ export default function EngineChatLayout({
         </div>
 
         {/* Right side: Contenido Multimedia */}
-        <div className={`hidden lg:block transition-all duration-300 ${sidebarOpen ? 'lg:basis-[50%] xl:basis-[52%]' : 'lg:basis-[50%] xl:basis-[52%]'} min-w-[420px]`}>
+        <div className={`hidden lg:block transition-all duration-300 ${sidebarOpen ? 'lg:basis-[30%] xl:basis-[32%]' : 'lg:basis-[30%] xl:basis-[32%]'} min-w-[320px]`}>
           <div className="h-full bg-white mx-3 my-0 rounded-2xl shadow-sm border border-slate-200 flex flex-col min-h-0">
             <div className="px-6 py-4 border-b border-slate-200">
-              <h3 className="font-semibold text-slate-900">Contenido Multimedia</h3>
+              <h3 className="text-sm font-semibold text-slate-900">Contenido Multimedia</h3>
             </div>
             <div className="flex-1 p-6 min-h-0 overflow-y-auto overscroll-contain">
               {isTyping || !currentMultimedia?.length ? (
@@ -335,7 +342,7 @@ export default function EngineChatLayout({
                       fetchPriority="high"
                     />
                   </div>
-                  <div className="mt-3 text-sm text-slate-700 text-center">
+                  <div className="mt-3 text-xs text-slate-700 text-center">
                     {(visibleMultimedia[Math.min(mediaIdx, Math.max(0, visibleMultimedia.length - 1))]?.caption
                       || visibleMultimedia[Math.min(mediaIdx, Math.max(0, visibleMultimedia.length - 1))]?.description
                       || visibleMultimedia[Math.min(mediaIdx, Math.max(0, visibleMultimedia.length - 1))]?.name
@@ -363,7 +370,7 @@ export default function EngineChatLayout({
                                 : 'text-blue-600 bg-white border-slate-300'
                             }`}
                           />
-                          <span className={`text-sm font-medium ${mediaIdx === index ? 'text-blue-700' : 'text-slate-700'}`}>
+                          <span className={`text-xs font-medium ${mediaIdx === index ? 'text-blue-700' : 'text-slate-700'}`}>
                             {image?.caption || image?.name || `Imagen ${index + 1}`}
                           </span>
                         </label>
@@ -372,7 +379,7 @@ export default function EngineChatLayout({
                   )}
                 </>
               )}
-              <div className="mt-4 text-xs text-slate-600">Contenido multimedia de la sesión</div>
+                             <div className="mt-4 text-[10px] text-slate-600">Contenido multimedia de la sesión</div>
             </div>
           </div>
         </div>
@@ -393,7 +400,7 @@ export default function EngineChatLayout({
             </button>
             <Image
               src={previewSrc}
-              alt="Instructora"
+              alt="Sophia Fuentes"
               width={640}
               height={640}
               className="max-h-[80vh] h-auto w-auto rounded-lg"

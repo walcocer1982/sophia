@@ -24,7 +24,6 @@
           "question": "¿Qué esperas aprender sobre procedimientos de seguridad en esta sesión?",
           "objective": "Elicitar expectativas del estudiante sobre la importancia de los procedimientos de seguridad",
           "answer_type": "open",
-          "expected": ["experiencias previas", "dudas específicas", "aplicación en el trabajo"],
           "acceptable_answers": ["partes del procedimiento", "cómo se aplica", "importancia de seguirlos", "selección de EPP"],
           "question_type": "metacognitiva"
         }
@@ -40,7 +39,6 @@
         { "code": "M2-Q01", "order": 2, "type": "ASK",
           "question": "¿Qué elementos de seguridad identificas en los trabajos de altura?",
           "objective": "Activar conocimientos previos sobre los elementos de seguridad en trabajos de altura",
-          "expected": ["arnés", "línea de vida", "casco", "guantes", "inspección previa", "supervisión"],
           "acceptable_answers": ["arnés", "arnés de seguridad", "línea", "línea de vida", "casco", "guantes", "inspección previa", "supervisión"],
           "question_type": "diagnóstica"
           
@@ -50,7 +48,6 @@
         { "code": "M2-Q02", "order": 3, "type": "ASK",
           "question": "¿Qué podría pasar si no se siguen los procedimientos correctos?",
           "objective": "Conciencia de riesgos",
-          "expected": ["caídas", "lesiones", "accidentes", "sanciones", "multas", "fatalidad"],
           "acceptable_answers": ["caídas", "lesiones", "accidentes", "sanciones", "multas", "muerte", "fatalidad", "accidente mortal", "daño grave"],
           "question_type": "reflexiva"
         }
@@ -71,7 +68,6 @@
           "question": "¿Cómo definirías un procedimiento de seguridad con tus palabras?",
           "objective": "Comprender la definición",
           "answer_type": "definition",
-          "expected": ["secuencia de pasos", "seguridad", "minimizar riesgos", "documentado"],
           "acceptable_answers": ["secuencia documentada de pasos", "realizar una tarea de forma segura", "minimizar riesgos laborales"],
           "question_type": "conceptual"
         },
@@ -84,7 +80,6 @@
         { "code": "M3-Q02", "order": 4, "type": "ASK",
           "question": "¿Qué partes debe incluir un procedimiento de seguridad completo?",
           "objective": "Identificar componentes",
-          "expected": ["objetivo", "alcance", "responsabilidades", "pasos específicos", "EPP", "emergencias", "registros"],
           "acceptable_answers": ["objetivo", "alcance", "responsabilidades", "pasos específicos", "epp requerido", "medidas de emergencia", "registros"],
           "question_type": "listado"
         },
@@ -100,7 +95,6 @@
           "question": "Menciona dos criterios para seleccionar EPP adecuadamente.",
           "objective": "Dominar criterios de selección de EPP",
           "answer_type": "list",
-          "expected": ["tipo de riesgo", "nivel de exposición", "compatibilidad", "ajuste", "certificaciones"],
           "acceptable_answers": ["tipo de riesgo", "nivel de exposición", "compatibilidad", "ajuste", "normativa", "certificaciones"],
           "question_type": "aplicación"
         }
@@ -120,7 +114,6 @@
           "question": "¿Qué EPP mínimo usarías y por qué?",
           "objective": "Justificar selección de EPP",
           "answer_type": "procedure",
-          "expected": ["arnés con línea de vida", "casco", "guantes", "calzado antideslizante", "justificación"],
           "acceptable_answers": ["arnés con línea de vida", "casco", "guantes", "calzado antideslizante"],
           "question_type": "aplicación"
         }
@@ -137,7 +130,6 @@
         { "code": "M5-Q01", "order": 2, "type": "ASK",
           "question": "¿Qué ventajas tiene documentar procedimientos frente a improvisar?",
           "objective": "Comparar enfoques",
-          "expected": ["estandarización", "reducción de errores", "trazabilidad", "cumplimiento"],
           "acceptable_answers": ["estandariza", "reduce errores", "trazabilidad", "cumplimiento"],
           "question_type": "argumentativa"
         }
@@ -155,7 +147,6 @@
           "question": "¿Qué cambio aplicarás esta semana para mejorar tu seguridad?",
           "objective": "Plan de mejora personal",
           "answer_type": "open",
-          "expected": ["compromiso específico", "cómo lo implementarás", "beneficios esperados"],
           "acceptable_answers": ["ejemplo personal", "compromiso concreto"],
           "question_type": "reflexiva"
         }

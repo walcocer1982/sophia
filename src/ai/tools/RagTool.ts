@@ -68,4 +68,19 @@ export async function retrieveTopK(query: string, index?: RagIndex, k: number = 
 	return scored.slice(0, Math.max(0, k)).map(s => s.text);
 }
 
+export async function retrieveTopKWithScores(query: string, index?: RagIndex, k: number = 3): Promise<Array<{ text: string; score: number }>> {
+	const q = String(query || '').trim();
+	if (!q || !index || !Array.isArray(index.byItem) || index.byItem.length === 0) return [];
+	const [qv] = await embedTexts([q]);
+	if (!qv || qv.length === 0) return [];
+	const scored = index.byItem.map(it => ({ text: it.text, score: cosine(qv, it.vec || []) }));
+	scored.sort((a, b) => b.score - a.score);
+	return scored.slice(0, Math.max(0, k));
+}
+
+export async function maxSimilarity(query: string, index?: RagIndex): Promise<number> {
+	const arr = await retrieveTopKWithScores(query, index, 1);
+	return arr.length ? Math.max(0, arr[0].score || 0) : 0;
+}
+
 
