@@ -6,7 +6,7 @@ function generateSessionKey(): string {
 	return `plan-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export function usePlanChat(planUrl: string = '') {
+export function usePlanChat(planUrl: string = '/courses/SSO001/lessons/lesson02.json') {
 	const [messages, setMessages] = useState<PlanChatMessage[]>([]);
 	const [isTyping, setIsTyping] = useState<boolean>(false);
 	const [done, setDone] = useState<boolean>(false);
@@ -32,7 +32,7 @@ export function usePlanChat(planUrl: string = '') {
 			}
 		}
 		// Primer turno para obtener el primer paso del plan (evitar doble invocación en StrictMode)
-		if (!bootedRef.current && planUrl) {
+		if (!bootedRef.current) {
 			bootedRef.current = true;
 			void turn('');
 		}

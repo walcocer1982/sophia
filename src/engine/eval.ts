@@ -1,5 +1,3 @@
-import { engineLogger } from './logger';
-
 export function normalize(input: string): string {
 	return (input || '')
 		.toLowerCase()
@@ -227,7 +225,7 @@ export async function evaluateHybrid(
   expected: string[] = [],
   policy: AskPolicy = { type: 'conceptual' },
   opts: HybridOpts = { fuzzy: { maxEditDistance: 1, similarityMin: 0.35 }, semThresh: 0.78, semBestThresh: 0.65, maxHints: 2 },
-  context?: { lastAnswer?: string; hintsUsed?: number; sessionKey?: string; stepCode?: string }
+  context?: { lastAnswer?: string; hintsUsed?: number }
 ): Promise<{ kind: 'ACCEPT'|'PARTIAL'|'HINT'|'REFOCUS'; reason: string; matched: string[]; missing: string[]; sem?: { cos: number; best?: { text: string; cos: number } } }> {
   // Umbrales de embeddings por tipo de pregunta (MUY PERMISIVOS)
   const getThresholdsByType = (type: string) => {
@@ -307,11 +305,6 @@ export async function evaluateHybrid(
   // Escalamiento a thinker para casos borderline/ambiguos
   if (cos >= 0.4 && cos < semThresh && (best?.cos || 0) >= 0.35) {
     try {
-      // Log de escalación iniciada
-      try {
-        engineLogger.escalationTriggered(context?.sessionKey || 'unknown', context?.stepCode || 'unknown', 'SEM_LOW');
-      } catch {}
-      
       const { escalateReasoning } = await import('./eval-escalation');
       const escalation = await escalateReasoning({
         student: user,
@@ -322,11 +315,6 @@ export async function evaluateHybrid(
         missing: acceptable.filter(a => a !== best?.text).slice(0,2),
         hintsUsed: context?.hintsUsed || 0
       });
-      
-      // Log de resultado de escalación
-      try {
-        engineLogger.escalationResult(context?.sessionKey || 'unknown', context?.stepCode || 'unknown', escalation);
-      } catch {}
       
       if (escalation.decision === 'ACCEPT') {
         return { kind: 'ACCEPT', reason: 'THINKER_ESCALATION', matched: best?.text ? [best.text] : [], missing: [], sem: { cos, best } };
@@ -351,7 +339,7 @@ export async function evaluateSemanticOnly(
   expected: string[] = [],
   policy: AskPolicy = { type: 'conceptual' },
   opts: SemanticOpts = { semThresh: 0.50, semBestThresh: 0.40, maxHints: 2 },
-  context?: { hintsUsed?: number; sessionKey?: string; stepCode?: string }
+  context?: { hintsUsed?: number }
 ): Promise<{ kind: 'ACCEPT'|'PARTIAL'|'HINT'|'REFOCUS'; reason: string; matched: string[]; missing: string[]; sem?: { cos: number; best?: { text: string; cos: number } } }> {
   const u = normalize(user);
   if (!u) return { kind: 'HINT', reason: 'EMPTY', matched: [], missing: acceptable.slice(0,3) };

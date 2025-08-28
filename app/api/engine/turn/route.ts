@@ -448,11 +448,9 @@ export async function POST(req: Request) {
 				const parts = [data.title, ...(data.body || []), data.text, ...(data.items || [])].filter(Boolean) as string[];
 				const bodyArr: string[] = parts as string[];
 				try {
-					// Anti-repetición por paso: explicar cada CONTENT/NARRATION solo una vez
-					const shownMap = state.shownByStepIndex || (state.shownByStepIndex = {});
-					const stepKey = `${act.step.momentIndex}-${act.step.stepIndex}`;
-					const already = Boolean((shownMap as any)[stepKey]);
-					if (!already) {
+					// Anti-repetición: emite narrativa sólo una vez por momento
+					const mIdx = act.step.momentIndex;
+					const already = Boolean(state.narrativesShownByMoment?.[mIdx]);
 					const recent = await getRecentHistory(sessionKey, 4);
 					const llm = await runDocenteLLM({
 						language: 'es',
@@ -463,11 +461,7 @@ export async function POST(req: Request) {
 						contentBody: bodyArr,
 						recentHistory: recent
 					});
-						message = llm.message || bodyArr.join(' — ') || 'Continuemos con el contenido.';
-						(shownMap as any)[stepKey] = true;
-					} else {
-						message = '';
-					}
+					message = already ? '' : llm.message;
 				} catch {
 					message = bodyArr.join(' — ') || 'Continuemos con el contenido.';
 				}
@@ -487,7 +481,8 @@ export async function POST(req: Request) {
 				// marcar flag para evitar eco y adelantar estado a la ASK
 				state.justAskedFollowUp = Boolean(followUp);
 				state.lastFollowUpText = followUp;
-				// marca narrativa mostrada por paso: ya marcada en shownByStepIndex
+				// marca narrativa mostrada
+				try { (state.narrativesShownByMoment ||= {})[act.step.momentIndex] = true; } catch {}
 				if (typeof targetIdx === 'number') { state = advanceTo(state, targetIdx); }
 				SESSIONS.set(sessionKey, state);
 				try { await getSessionStore().set(sessionKey, state); } catch {}
@@ -605,12 +600,7 @@ export async function POST(req: Request) {
           const answerType = (act.step.data as any)?.answer_type || '';
           const rubric = (act.step.data as any)?.rubric || {};
           const objText = String(act.step.data?.objective || '');
-          const isOpen = (answerType === 'open') || String((act.step.data as any)?.question_type || '').toLowerCase().includes('abierta');
-          
-          // Log de inicio de evaluación
-          try {
-            engineLogger.evaluationStart(sessionKey, stepCode, pendingInput);
-          } catch {}
+          const isOpen = (answerType === 'open') || String((act.step.data as any)?.question_type || '').toLowerCase().includes('abierta') || ['SALUDO','CONEXION'].includes(momentKind);
           
           let cls: any;
           let vague: boolean = false;
@@ -642,22 +632,21 @@ export async function POST(req: Request) {
                   delta: (state as any)?.teacherProfile?.eval?.vagueCenter?.delta,
                   tauObj: isOpen ? (Number((state as any)?.teacherProfile?.eval?.vagueCenter?.tauObjOpen ?? th.semThresh)) : (Number((state as any)?.teacherProfile?.eval?.vagueCenter?.tauObjClosed ?? th.semThresh))
                 } },
-                { hintsUsed, sessionKey, stepCode }
+                { hintsUsed }
               );
-              cls = { kind: sem.kind, matched: sem.matched, missing: sem.missing, reason: sem.reason, sem: sem.sem };
+              cls = { kind: sem.kind, matched: sem.matched, missing: sem.missing, sem: sem.sem };
               vague = false;
             }
             // Evaluación basada en objective (no keywords específicos)
             if (!vague && cls?.kind !== 'ACCEPT') {
               try {
                 const objective = String(act.step.data?.objective || '');
-                const textN = normalize(String(pendingInput || ''));
+                const textN = String(pendingInput || '').toLowerCase();
                 // Evaluar si la respuesta está alineada con el objective
-                const objectiveWords = normalize(objective).split(/\s+/).filter(word => word.length > 3);
-                const kwHits = objectiveWords.filter(k => textN.includes(k)).length;
+                const objectiveWords = objective.split(/\s+/).filter(word => word.length > 3);
+                const kwHits = objectiveWords.filter(k => textN.includes(String(k).toLowerCase())).length;
                 const kwMin = Number(((coursePolicies as any)?.evaluation?.thresholds?.keywordMin) ?? 1);
-                // Suavizar: si hay señal semántica previa (cls.kind === 'PARTIAL'), no degradar a HINT solo por keywords
-                if (kwHits < kwMin && cls?.kind !== 'PARTIAL') { (cls as any).kind = 'HINT'; }
+                if (kwHits < kwMin) { (cls as any).kind = 'HINT'; }
               } catch {}
             }
             // Capturar evaluación para rúbrica
@@ -667,31 +656,11 @@ export async function POST(req: Request) {
             lastAttempts = attempts;
             lastHints = hintsUsed;
             lastStepCodeForAssess = stepCode;
-            
-            // Log de clasificación de evaluación
-            try {
-              engineLogger.evaluationResult(sessionKey, stepCode, cls.kind as any, cls.reason);
-            } catch {}
-            // Log explícito en consola (si debug activo por políticas o env)
-            try {
-              const debugOnNow = process.env.ENGINE_DEBUG === 'true' || process.env.NEXT_PUBLIC_ENGINE_DEBUG === 'true' || Boolean((coursePolicies as any)?.debug?.logs);
-              if (debugOnNow) {
-                // eslint-disable-next-line no-console
-                console.debug(JSON.stringify({
-                  tag: 'evaluation.result',
-                  sessionKey,
-                  stepCode,
-                  classification: cls.kind,
-                  reason: cls.reason,
-                  matched: (Array.isArray(cls.matched) ? cls.matched.slice(0,5) : []),
-                  missing: (Array.isArray(cls.missing) ? cls.missing.slice(0,5) : [])
-                }));
-              }
-            } catch {}
           }
           
           // Endurecer aceptación en SALUDO/CONEXIÓN (evitar falsos ACCEPT)
-          const isMeta = String(qtype).includes('abierta');
+          const isSaludoConexion = ['SALUDO','CONEXION'].includes(momentKind);
+          const isMeta = String(qtype).includes('abierta') || isSaludoConexion;
           
           // Aceptación en metacognitivas: permitir avance con 1 señal válida
           if (isMeta && cls.kind === 'ACCEPT') {
@@ -764,9 +733,7 @@ export async function POST(req: Request) {
             try {
               const fbCfg: any = (coursePolicies as any)?.feedback || {};
               const recent = await getRecentHistory(sessionKey, 4);
-              // En ACCEPT, evitar re-preguntar dentro del feedback por defecto
-              const allowQ = fbCfg && typeof fbCfg.allowQuestions === 'boolean' ? Boolean(fbCfg.allowQuestions) : false;
-              const llm = await runDocenteLLM({ language: 'es', action: 'feedback', stepType: 'ASK', questionText: q, userAnswer: pendingInput, matched: cls.matched, missing: cls.missing, objective: String(act.step.data.objective || ''), contentBody: [String(act.step.data?.objective || '')], hintWordLimit: Number(fbCfg.maxSentences ?? 3), allowQuestions: allowQ, kind: 'ACCEPT' as any, recentHistory: recent });
+              const llm = await runDocenteLLM({ language: 'es', action: 'feedback', stepType: 'ASK', questionText: q, userAnswer: pendingInput, matched: cls.matched, missing: cls.missing, objective: String(act.step.data.objective || ''), contentBody: [String(act.step.data?.objective || '')], hintWordLimit: Number(fbCfg.maxSentences ?? 3), allowQuestions: fbCfg.allowQuestions !== false, kind: 'ACCEPT' as any, recentHistory: recent });
               fb = llm.message || '';
             } catch {}
             
@@ -784,10 +751,9 @@ export async function POST(req: Request) {
             const isAnswered = Array.isArray(state.answeredAskCodes) && state.answeredAskCodes.includes(currentStepCode);
 
             if (!isAnswered && act.step.type === 'ASK') {
-              // No avanzar si la ASK actual no está respondida, salvo si la política lo permite
+              // No avanzar si la ASK actual no está respondida (excepto SALUDO/CONEXIÓN)
               const mk = mapMomentKind(state.plan?.moments?.[act.step.momentIndex]?.title);
-              const allowForcedArr = Array.isArray((coursePolicies as any)?.advance?.allowForcedOn) ? (coursePolicies as any).advance.allowForcedOn as string[] : ['CONEXION'];
-              const policyAllowsForce = allowForcedArr.includes(mk);
+              const policyAllowsForce = ['SALUDO', 'CONEXION'].includes(mk);
 
               if (!policyAllowsForce) {
                 // Re-preguntar la ASK actual
@@ -806,66 +772,79 @@ export async function POST(req: Request) {
             
             // Componer salida según el tipo de paso siguiente
             let nextMsg = '';
-            
-            // Consumir pasos narrativos consecutivos (NARRATION, CONTENT, CASE)
-            while (true) {
-              const ns = currentStep(state);
+            const nextStep = currentStep(state);
             
             // Debug: verificar qué paso es el siguiente
             if (process.env.ENGINE_DEBUG === 'true') {
               console.log('[AVANCE_ACCEPT]', { 
-                  nextStepType: ns?.type, 
-                  nextStepCode: ns?.code,
-                  nextStepText: ns?.data?.text?.slice(0, 50),
-                  momentIndex: ns?.momentIndex,
-                  stepIndex: ns?.stepIndex
-                });
-              }
-
-              if (!ns) break;
-              if (ns.type === 'NARRATION' || ns.type === 'CONTENT' || ns.type === 'CASE') {
+                nextStepType: nextStep?.type, 
+                nextStepCode: nextStep?.code,
+                nextStepText: nextStep?.data?.text?.slice(0, 50),
+                momentIndex: nextStep?.momentIndex,
+                stepIndex: nextStep?.stepIndex
+              });
+            }
+            
+            if (nextStep?.type === 'NARRATION' || nextStep?.type === 'CONTENT') {
               // Blindaje anti-repetición: verificar si ya se mostró este contenido
               const shownMap = state.shownByStepIndex || (state.shownByStepIndex = {});
-                const stepKey = `${ns.momentIndex}-${ns.stepIndex}`;
+              const stepKey = `${nextStep.momentIndex}-${nextStep.stepIndex}`;
+              
               if (!(shownMap as any)[stepKey]) {
+                // Si NO se ha mostrado, ejecutarlo y marcar como mostrado
                 try {
                   const recent = await getRecentHistory(sessionKey, 4);
                   const explain = await runDocenteLLM({ 
                     language: 'es', 
                     action: 'explain', 
-                      stepType: ns.type, 
-                      narrationText: ns.data?.text || '',
-                      contentBody: ns.data?.body || [],
-                      caseText: (ns.data as any)?.case || '',
-                      objective: String(ns.data?.objective || state.plan?.meta?.lesson_name || ''),
+                    stepType: nextStep.type, 
+                    narrationText: nextStep.data?.text || '',
+                    contentBody: nextStep.data?.body || [],
+                    caseText: (nextStep.data as any)?.case || '',
+                    objective: String(nextStep.data?.objective || state.plan?.meta?.lesson_name || ''),
                     recentHistory: recent 
                   });
-                    // Acumular narrativa únicamente si hay contenido real
+                  // Blindaje: solo marcar como mostrado si hay contenido real
                   if ((explain.message || '').trim()) {
-                      nextMsg = composeUniqueText(nextMsg, explain.message!);
-                      (shownMap as any)[stepKey] = true;
-                    }
-                  } catch {}
+                    nextMsg = explain.message!;
+                    (shownMap as any)[stepKey] = true; // marca solo si hubo contenido
+                  } else {
+                    nextMsg = '';
+                    // NO marcar shownMap si está vacío
+                  }
+                  
+                  // Debug: confirmar que se ejecutó la narrativa
+                  if (process.env.ENGINE_DEBUG === 'true') {
+                    console.log('[NARRATIVA_EJECUTADA]', { 
+                      stepKey, 
+                      nextMsgLength: nextMsg.length,
+                      nextMsgPreview: nextMsg.slice(0, 100)
+                    });
+                  }
+                } catch (error) { 
+                  nextMsg = '';
+                  if (process.env.ENGINE_DEBUG === 'true') {
+                    console.log('[NARRATIVA_ERROR]', { stepKey, error: String(error) });
+                  }
                 }
-                // Avanzar al siguiente paso tras la narrativa (se haya mostrado o no)
+              } else {
+                // Debug: confirmar que ya se mostró
+                if (process.env.ENGINE_DEBUG === 'true') {
+                  console.log('[NARRATIVA_YA_MOSTRADA]', { stepKey });
+                }
+              }
+              // Avanzar al siguiente paso después de la narrativa (se haya mostrado o no)
               state = next(state);
               SESSIONS.set(sessionKey, state);
               try { await getSessionStore().set(sessionKey, state); } catch {}
-                continue;
-              }
-              break;
             }
             
-            // Si hay una pregunta siguiente, ponerla como followUp (evitar repetir la misma ASK)
+            // Si hay una pregunta siguiente, ponerla como followUp
             const nextAskStep = currentStep(state);
             if (nextAskStep?.type === 'ASK') {
-              const justAnswered = act.step.code || stepCode;
-              const candidateCode = nextAskStep.code || nextAskStep.data?.code;
-              if (candidateCode && candidateCode !== justAnswered) {
               followUp = nextAskStep.data?.question || '';
               state.justAskedFollowUp = Boolean(followUp);
               dbg = { ...(dbg || {}), messageType: 'ask', nextAction: 'ask' };
-              }
             }
             
             SESSIONS.set(sessionKey, state);
@@ -910,8 +889,7 @@ export async function POST(req: Request) {
             try {
               const momentKindNow = mapMomentKind(state.plan?.moments?.[act.step.momentIndex]?.title);
               const noSeCountNow = state.noSeCountByAskCode?.[stepCode] || 0;
-              const allowForcedArr = Array.isArray((coursePolicies as any)?.advance?.allowForcedOn) ? (coursePolicies as any).advance.allowForcedOn as string[] : allowForcedOn;
-              const forceDecision = decideForceAdvanceByNoSe({ noSeCount: noSeCountNow, forceNoSeThreshold, allowForcedOn: allowForcedArr, momentKind: momentKindNow });
+              const forceDecision = decideForceAdvanceByNoSe({ noSeCount: noSeCountNow, forceNoSeThreshold, allowForcedOn, momentKind: momentKindNow });
               if (isNo && forceDecision.shouldForceAdvance) {
                 // Mover a la siguiente ASK del mismo ciclo, respetando narrativa previa
                 const nextAskIdx = getNextAskInSameCycle(state, state.stepIdx);

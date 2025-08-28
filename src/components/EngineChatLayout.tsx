@@ -32,18 +32,10 @@ export default function EngineChatLayout({
 
   const mediaImages: string[] = useMemo(() => {
     try {
-      // 1) Priorizar imágenes del momento actual
-      const momentIdx: number = Number((state as any)?.momentIdx || (state as any)?.state?.momentIdx || 0);
-      const momentImages: any[] = (vm as any)?.moments?.[momentIdx]?.images || [];
-      const normalizedMoment = momentImages.map((it: any) => (typeof it === 'string' ? it : (it?.url || it?.src || it?.image))).filter(Boolean);
-      if (normalizedMoment.length) return normalizedMoment;
-
-      // 2) Si no hay en momento, intentar por paso desde vm.media
       const stepCode: string | undefined = (state as any)?.stepCode || (state as any)?.state?.stepCode;
       const entry = (vm as any)?.media?.[stepCode || ''] || {};
       const images = entry?.images;
-      const byStep = Array.isArray(images) ? images.filter(Boolean) : [];
-      return byStep;
+      return Array.isArray(images) ? images.filter(Boolean) : [];
     } catch { return []; }
   }, [vm, state]);
 
@@ -58,17 +50,6 @@ export default function EngineChatLayout({
   };
   const currentMultimedia: MediaItem[] = useMemo(() => {
     try {
-      // 1) Priorizar imágenes del momento para todo el curso/JSON
-      const momentIdx: number = Number((state as any)?.momentIdx || (state as any)?.state?.momentIdx || 0);
-      const momentImages: any[] = (vm as any)?.moments?.[momentIdx]?.images || [];
-      if (Array.isArray(momentImages) && momentImages.length) {
-        return momentImages
-          .map((it: any) => (typeof it === 'string' ? { url: it } : { url: it?.url || it?.src || it?.image, name: it?.name || it?.title, description: it?.description || it?.desc, caption: it?.caption || it?.label }))
-          .filter((it: any) => !!it.url)
-          .map((it: any) => ({ url: it.url, name: it.name || deriveNameFromUrl(it.url), description: it.description || '', caption: it.caption || it.description || deriveNameFromUrl(it.url) }));
-      }
-
-      // 2) Si no hay imágenes por momento, usar mapping por paso (plan/media del curso)
       const stepCode: string | undefined = (state as any)?.stepCode || (state as any)?.state?.stepCode;
       const entry = (vm as any)?.media?.[stepCode || ''] || {};
       const baseRaw = Array.isArray(entry?.items) ? entry.items : [];
@@ -82,8 +63,6 @@ export default function EngineChatLayout({
         });
         return [...baseRaw.map(mapIt), ...hintRaw.map(mapIt)].filter((it: MediaItem) => !!it.url);
       }
-
-      // 3) Último recurso: lista simple de URLs detectadas
       const imgs = mediaImages;
       return imgs.map((url) => ({ url, name: deriveNameFromUrl(url), caption: deriveNameFromUrl(url) }));
     } catch { return mediaImages.map((url) => ({ url, name: deriveNameFromUrl(url), caption: deriveNameFromUrl(url) })); }
@@ -92,18 +71,11 @@ export default function EngineChatLayout({
   // Limitar elementos visibles según progreso de hints (si viene del engine)
   const visibleMultimedia: MediaItem[] = useMemo(() => {
     try {
-      // 0) Si hay imágenes definidas a nivel de momento, usarlas siempre (sin esquema base/hints)
-      const momentIdx: number = Number((state as any)?.momentIdx || (state as any)?.state?.momentIdx || 0);
-      const momentImages: any[] = (vm as any)?.moments?.[momentIdx]?.images || [];
-      if (Array.isArray(momentImages) && momentImages.length) {
-        return currentMultimedia; // ya normalizadas en currentMultimedia
-      }
-
       const stepCode: string | undefined = (state as any)?.stepCode || (state as any)?.state?.stepCode;
       const entry = (vm as any)?.media?.[stepCode || ''] || {};
       const baseRaw = Array.isArray(entry?.items) ? entry.items : [];
       const hintRaw = Array.isArray(entry?.hintItems) ? entry.hintItems : [];
-      const hintsUsedLocal = Number((state as any)?.hintsUsed || 0);
+      const hintsUsed = Number((state as any)?.hintsUsed || 0);
       if (baseRaw.length || hintRaw.length) {
         const mapIt = (it: any) => ({
           url: it?.url || it?.src || it?.image || '',
@@ -113,12 +85,12 @@ export default function EngineChatLayout({
         });
         const base = baseRaw.map(mapIt).filter((it: MediaItem) => !!it.url);
         const hintAll = hintRaw.map(mapIt).filter((it: MediaItem) => !!it.url);
-        const unlocked = hintAll.slice(0, Math.max(0, Math.min(hintsUsedLocal, hintAll.length)));
+        const unlocked = hintAll.slice(0, Math.max(0, Math.min(hintsUsed, hintAll.length)));
         return [...base, ...unlocked];
       }
       // Sin esquema base/hints -> fallback progresivo simple
-      const hintsUsedBasic = Number((state as any)?.hintsUsed || 0);
-      const cap = Math.min(currentMultimedia.length, Math.max(1, hintsUsedBasic + 1));
+      const maxHints = Math.max(1, Number((state as any)?.maxHints || 3));
+      const cap = Math.min(currentMultimedia.length, Math.max(1, hintsUsed + 1));
       return currentMultimedia.slice(0, cap);
     } catch { return currentMultimedia; }
   }, [vm, state, currentMultimedia]);

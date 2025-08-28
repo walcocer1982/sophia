@@ -8,11 +8,6 @@
           "id": "lesson02",
           "name": "Lección 02",
           "planUrl": "/courses/SSO001/lessons/lesson02.json"
-        },
-        {
-          "id": "lesson01",
-          "name": "IPERC Continuo - Identificación y Control de Riesgos",
-          "planUrl": "/courses/SSO001/lessons/lesson01.json"
         }
       ]
     }
