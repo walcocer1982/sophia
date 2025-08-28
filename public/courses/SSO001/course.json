@@ -14,6 +14,12 @@
       "title": "Procedimientos de Seguridad",
       "order": 2,
       "path": "/courses/SSO001/lessons/lesson02.json"
+    },
+    {
+      "id": "lesson01",
+      "title": "IPERC Continuo - Identificación y Control de Riesgos",
+      "order": 1,
+      "path": "/courses/SSO001/lessons/lesson01.json"
     }
   ]
 }
