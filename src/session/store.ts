@@ -1,6 +1,7 @@
 import type { SessionState } from '@/session/state';
 import fs from 'fs/promises';
 import path from 'path';
+import { getCollection } from '@/lib/mongo';
 
 export interface SessionStore {
   get(sessionKey: string): Promise<SessionState | undefined>;
@@ -58,11 +59,31 @@ class JsonFileStore implements SessionStore {
   }
 }
 
+class MongoSessionStore implements SessionStore {
+  private async col() { return getCollection<{ _id: string; state: SessionState; lastActivity: number }>('sessions'); }
+  async get(k: string) {
+    const doc = await (await this.col()).findOne({ _id: k });
+    return doc?.state;
+  }
+  async set(k: string, v: SessionState) {
+    await (await this.col()).updateOne(
+      { _id: k },
+      { $set: { state: v, lastActivity: Date.now() } },
+      { upsert: true }
+    );
+  }
+  async delete(k: string) {
+    await (await this.col()).deleteOne({ _id: k });
+  }
+}
+
 let storeInstance: SessionStore | null = null;
 export function getSessionStore(): SessionStore {
   if (storeInstance) return storeInstance;
-  const useFile = process.env.SESSION_STORE === 'file';
-  storeInstance = useFile ? new JsonFileStore() : new MemoryStore();
+  const mode = (process.env.SESSION_STORE || '').toLowerCase();
+  if (mode === 'mongo') storeInstance = new MongoSessionStore();
+  else if (mode === 'file') storeInstance = new JsonFileStore();
+  else storeInstance = new MemoryStore();
   return storeInstance;
 }
 

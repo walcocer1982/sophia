@@ -8,7 +8,9 @@ import { isGreetingInput } from '@/engine/questions';
 import { isPersonalInfoQuery } from '@/engine/questions';
 import { advanceTo, currentStep, decideAction, decideNextAction, getNextAskInSameCycle, next } from '@/engine/runner';
 import { loadAndCompile } from '@/plan/compilePlan';
-import { appendHistory, clearHistory, getRecentHistory } from '@/session/history';
+import { appendHistory, clearHistory, getRecentHistory, setUserLastSession } from '@/session/history';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/authOptions';
 import { SessionState, initSession } from '@/session/state';
 import { getSessionStore } from '@/session/store';
 import { resolveTeacherProfile } from '@/teacher/resolveProfile';
@@ -108,6 +110,12 @@ export async function POST(req: Request) {
 	try {
 		const body = (await req.json()) as Body;
 		const { sessionKey, userInput = '', planUrl = '/courses/SSO001/lessons/lesson02.json', reset = false, clientState, adaptiveMode = false } = body;
+    // Obtener email del usuario si está autenticado
+    let email: string | undefined;
+    try {
+      const session: any = await getServerSession(authOptions as any);
+      email = session?.user?.email || undefined;
+    } catch {}
 		let pendingInput = (userInput || '').toString();
 		if (reset) {
 			SESSIONS.delete(sessionKey);
@@ -161,6 +169,14 @@ export async function POST(req: Request) {
     });
     (state as any).teacherProfile = teacherProfile;
 		const step = currentStep(state);
+
+    // Persistir mensaje del estudiante si viene input
+    if (pendingInput && pendingInput.trim()) {
+      try {
+        await appendHistory(sessionKey, { planUrl: state.planUrl, stepIdx: state.stepIdx, momentIdx: state.momentIdx, content: pendingInput, sender: 'student', email });
+        if (email) await setUserLastSession(email, sessionKey);
+      } catch {}
+    }
 		// Debug inicio de turno
 		try {
 			const debugOn = process.env.ENGINE_DEBUG === 'true' || process.env.NEXT_PUBLIC_ENGINE_DEBUG === 'true' || Boolean((coursePolicies as any)?.debug?.logs);
@@ -1176,14 +1192,23 @@ export async function POST(req: Request) {
 				message = q2 || message || '';
 			}
 		}
-		// Persist history (JSONL estilo MongoDB-like)
+		// Persist history (JSONL/Mongo)
 		try {
 			await appendHistory(sessionKey, {
 				planUrl: state.planUrl,
 				stepIdx: state.stepIdx,
 				momentIdx: state.momentIdx,
 				message,
-				followUp
+				followUp,
+				sender: 'ai',
+				email,
+				// Metadatos de clasificación para auditoría y reanudación
+				kind: (dbg as any)?.kind,
+				feedbackKind: (dbg as any)?.feedbackKind || (dbg as any)?.kind,
+				nextAction: (dbg as any)?.nextAction,
+				stepCode: (dbg as any)?.stepCode || (currentStep(state) as any)?.code,
+				matched: (dbg as any)?.matched,
+				missing: (dbg as any)?.missing
 			});
 		} catch {}
 

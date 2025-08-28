@@ -4,35 +4,35 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 function setInput(root: TestRenderer.ReactTestRenderer['root'], value: string) {
-  const input = root.findAll((n) => n.type === 'input')[0];
+  const input = root.findAll((n: any) => n.type === 'input')[0];
   act(() => input.props.onChange({ target: { value } }));
 }
 
 function clickSend(root: TestRenderer.ReactTestRenderer['root']) {
-  const btn = root.findAll((n) => n.type === 'button')[0];
+  const btn = root.findAll((n: any) => n.type === 'button')[0];
   act(() => btn.props.onClick());
 }
 
 function getLabels(root: TestRenderer.ReactTestRenderer['root']): string[] {
-  const nodes = root.findAll((n) => n.type === 'span' && String(n.props.className || '').includes('font-semibold'));
-  return nodes.map((n) => (Array.isArray(n.children) ? n.children.join('') : String(n.children || '')));
+  const nodes = root.findAll((n: any) => n.type === 'span' && String(n.props.className || '').includes('font-semibold'));
+  return nodes.map((n: any) => (Array.isArray(n.children) ? n.children.join('') : String(n.children || '')));
 }
 
 function getKinds(root: TestRenderer.ReactTestRenderer['root']): string[] {
-  const nodes = root.findAll((n) => n.type === 'span' && String(n.props.className || '').includes('uppercase'));
-  return nodes.map((n) => (Array.isArray(n.children) ? n.children.join('') : String(n.children || '')));
+  const nodes = root.findAll((n: any) => n.type === 'span' && String(n.props.className || '').includes('uppercase'));
+  return nodes.map((n: any) => (Array.isArray(n.children) ? n.children.join('') : String(n.children || '')));
 }
 
 function getLastFeedback(root: TestRenderer.ReactTestRenderer['root']): string {
-  const nodes = root.findAll((n) => n.type === 'div' && String(n.props.className || '').includes('whitespace-pre-wrap'));
+  const nodes = root.findAll((n: any) => n.type === 'div' && String(n.props.className || '').includes('whitespace-pre-wrap'));
   const last = nodes[nodes.length - 1];
   if (!last) return '';
-  return Array.isArray(last.children) ? last.children.join('') : String(last.children || '');
+  return Array.isArray(last.children) ? (last.children as any[]).join('') : String(last.children || '');
 }
 
 describe('FeedbackSequential UI', () => {
   it('mapea HINT a F0/F1 según intento (F0 en intentos 0 y 1, F1 en 2)', () => {
-    let renderer: TestRenderer.ReactTestRenderer;
+    let renderer = TestRenderer.create(<div />);
     act(() => {
       renderer = TestRenderer.create(
         <FeedbackSequential
@@ -49,7 +49,7 @@ describe('FeedbackSequential UI', () => {
         />
       );
     });
-    const root = (renderer as TestRenderer.ReactTestRenderer).root;
+    const root = renderer.root;
 
     // intento 0: vacío → HINT → F0
     setInput(root, '');
@@ -71,7 +71,7 @@ describe('FeedbackSequential UI', () => {
 
   it('PARTIAL y ACCEPT se etiquetan F2 y completan acorde', () => {
     let onComplete = vi.fn();
-    let renderer: TestRenderer.ReactTestRenderer;
+    let renderer = TestRenderer.create(<div />);
     act(() => {
       renderer = TestRenderer.create(
         <FeedbackSequential
@@ -87,7 +87,7 @@ describe('FeedbackSequential UI', () => {
         />
       );
     });
-    const root = (renderer as TestRenderer.ReactTestRenderer).root;
+    const root = renderer.root;
 
     // PARTIAL por expected
     setInput(root, 'La semilla...');
@@ -111,7 +111,7 @@ describe('FeedbackSequential UI', () => {
 
   it('al agotar intentos con finalExplanation agrega F2 final y emite force_advance', () => {
     let onComplete = vi.fn();
-    let renderer: TestRenderer.ReactTestRenderer;
+    let renderer = TestRenderer.create(<div />);
     act(() => {
       renderer = TestRenderer.create(
         <FeedbackSequential
@@ -126,7 +126,7 @@ describe('FeedbackSequential UI', () => {
         />
       );
     });
-    const root = (renderer as TestRenderer.ReactTestRenderer).root;
+    const root = renderer.root;
 
     // Tres intentos fallidos
     setInput(root, 'foo'); clickSend(root);

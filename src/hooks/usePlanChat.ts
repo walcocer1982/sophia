@@ -31,13 +31,60 @@ export function usePlanChat(planUrl: string = '/courses/SSO001/lessons/lesson02.
 				sessionKeyRef.current = generateSessionKey();
 			}
 		}
-		// Primer turno para obtener el primer paso del plan (evitar doble invocación en StrictMode)
-		if (!bootedRef.current) {
-			bootedRef.current = true;
-			void turn('');
-		}
+		// El primer turno se disparará solo si no hay historial precargado (ver efecto de preload)
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [planUrl]);
+
+	// Precargar historial desde servidor (última sesión del usuario)
+	useEffect(() => {
+		(async () => {
+			try {
+				const res = await fetch('/api/history?by=user', { cache: 'no-store' });
+				if (!res.ok) return;
+				const data = await res.json();
+				const items: Array<{ sender?: 'ai'|'student'; content?: string; message?: string; followUp?: string; ts?: number }> = data.items || [];
+				if (!Array.isArray(items) || !items.length) {
+					if (!bootedRef.current) { bootedRef.current = true; void turn(''); }
+					return;
+				}
+				const msgs = items.map((it: any, idx: number) => {
+					const content = typeof it.content === 'string' && it.content
+						? it.content
+						: [it.message, it.followUp].filter(Boolean).join('\n\n');
+					const sender = (it.sender === 'student' ? 'student' : 'ai');
+					return { id: `${idx+1}` as string, sender, content, timestamp: new Date(it.ts || Date.now()) } as PlanChatMessage;
+				}).filter(m => m.content);
+				if (msgs.length) {
+					setMessages(msgs);
+					// Avanzar el contador de IDs para que no colisione con mensajes nuevos
+					try { idSeq.current = msgs.length + 1; } catch {}
+					// Rehidratar estado mínimo si viene del backend
+					try {
+						const st = data.state as any;
+						if (st && typeof st === 'object') {
+							setEngineState({ stepIdx: Number(st.stepIdx)||0, momentIdx: Number(st.momentIdx)||0, done: Boolean(st.done), stepCode: st.stepCode });
+						}
+					} catch {}
+					try {
+						const key = data.sessionKey as string | undefined;
+						if (key) {
+							sessionKeyRef.current = key;
+							if (typeof window !== 'undefined') window.sessionStorage.setItem('planSessionKey', key);
+						}
+					} catch {}
+					// Disparar un turno sólo si el último mensaje fue del estudiante (bot debe responder)
+					if (!bootedRef.current) {
+						bootedRef.current = true;
+						const last = msgs[msgs.length - 1];
+						const done = Boolean((data.state && (data.state as any).done) || false);
+						if (last?.sender === 'student' && !done) {
+							void turn('');
+						}
+					}
+				}
+			} catch {}
+		})();
+	}, []);
 
   async function turn(userInput: string) {
 		if (done) return;
@@ -55,7 +102,8 @@ export function usePlanChat(planUrl: string = '/courses/SSO001/lessons/lesson02.
 					userInput, 
 					planUrl, 
 					reset: !messages.length,
-					adaptiveMode 
+					adaptiveMode,
+					clientState: engineState
 				})
 			});
 			if (!res.ok) throw new Error('engine turn failed');
