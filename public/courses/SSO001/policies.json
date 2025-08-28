@@ -104,7 +104,8 @@
     "listado": "listado",
     "reflexiva": "reflexiva",
     "experiencial": "experiencial"
-  }
+  },
+  "debug": { "logs": true }
 }
 
 

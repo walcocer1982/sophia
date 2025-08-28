@@ -2,6 +2,7 @@
 import EngineChatLayout from '@/components/EngineChatLayout';
 import { usePlanChat } from '@/hooks/usePlanChat';
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 type LessonRef = { id: string; name?: string; planUrl: string };
 type CourseRef = { id: string; name?: string; lessons: LessonRef[] };
@@ -12,6 +13,7 @@ export default function EngineChatPage() {
   const [selectedCourseId, setSelectedCourseId] = useState<string>('');
   const [selectedLessonId, setSelectedLessonId] = useState<string>('');
   const [lessonVM, setLessonVM] = useState<any>(null);
+  const searchParams = useSearchParams();
 
   // derive current planUrl from selection
   const planUrl: string | null = useMemo(() => {
@@ -21,7 +23,7 @@ export default function EngineChatPage() {
     return lesson?.planUrl || null;
   }, [registry, selectedCourseId, selectedLessonId]);
 
-  const { messages, isTyping, done, sendMessage, clearMessages, adaptiveMode, setAdaptiveMode, budgetMetrics, state } = usePlanChat(planUrl || '/courses/SSO001/lessons/lesson02.json');
+  const { messages, isTyping, done, sendMessage, clearMessages, adaptiveMode, setAdaptiveMode, budgetMetrics, state } = usePlanChat(planUrl || '');
   const showControls = false;
 
   useEffect(() => {
@@ -33,17 +35,21 @@ export default function EngineChatPage() {
         const json = (await res.json()) as Registry;
         if (!alive) return;
         setRegistry(json);
-        // default selection: first course/lesson
-        const c = json.courses?.[0];
-        if (c) {
-          setSelectedCourseId(prev => prev || c.id);
-          const l = c.lessons?.[0];
-          if (l) setSelectedLessonId(prev => prev || l.id);
+        // selección por querystring o por defecto (primer curso/lección)
+        const qCourse = searchParams?.get('course');
+        const qLesson = searchParams?.get('lesson');
+        const fallbackCourse = json.courses?.[0];
+        const course = (qCourse && json.courses.find(c => c.id === qCourse)) || fallbackCourse;
+        if (course) {
+          setSelectedCourseId(prev => prev || course.id);
+          const fallbackLesson = course.lessons?.[0];
+          const lesson = (qLesson && course.lessons.find(l => l.id === qLesson)) || fallbackLesson;
+          if (lesson) setSelectedLessonId(prev => prev || lesson.id);
         }
       } catch {}
     })();
     return () => { alive = false; };
-  }, []);
+  }, [searchParams]);
 
   // Cargar el plan y construir VM (aprendizaje esperado, puntos clave y momentos) al cambiar planUrl
   useEffect(() => {
@@ -51,21 +57,26 @@ export default function EngineChatPage() {
     if (!planUrl) return;
     (async () => {
       try {
-        const res = await fetch(planUrl);
+        // Evitar caching del navegador durante edición
+        const res = await fetch(`${planUrl}${planUrl.includes('?') ? '&' : '?'}ts=${Date.now()}`, { cache: 'no-store' } as any);
         if (!res.ok) return;
         const plan = await res.json();
         if (!alive) return;
         // Fusionar media del plan con documento externo en /public/media/{course}.json
+        // Si el plan ya trae imágenes por momento, priorizamos esas y evitamos arrastrar media global que pueda colisionar entre lecciones
         let mergedMedia: any = plan?.media || {};
-        try {
-          const docUrl = selectedCourseId ? `/media/${selectedCourseId}.json` : '/media/SSO001.json';
-          const mRes = await fetch(`/api/media?planUrl=${encodeURIComponent(planUrl)}&docUrl=${encodeURIComponent(docUrl)}`);
-          if (mRes.ok) {
-            const mJson = await mRes.json();
-            mergedMedia = mJson?.media || mergedMedia;
-          }
-        } catch {}
-        const moments = (plan.moments || []).map((m: any) => ({ title: m.title }));
+        const hasMomentImages = Array.isArray(plan?.moments) && (plan.moments as any[]).some((m: any) => Array.isArray(m?.images) && m.images.length > 0);
+        if (!hasMomentImages) {
+          try {
+            const docUrl = selectedCourseId ? `/media/${selectedCourseId}.json` : '/media/SSO001.json';
+            const mRes = await fetch(`/api/media?planUrl=${encodeURIComponent(planUrl)}&docUrl=${encodeURIComponent(docUrl)}`);
+            if (mRes.ok) {
+              const mJson = await mRes.json();
+              mergedMedia = mJson?.media || mergedMedia;
+            }
+          } catch {}
+        }
+        const moments = (plan.moments || []).map((m: any) => ({ title: m.title, images: m.images }));
         const keyPoints: Array<{ id: string; title: string; description?: string; completed?: boolean }> = [];
         const expectedLearning: string[] = [];
         (plan.moments || []).forEach((m: any, mi: number) => {
