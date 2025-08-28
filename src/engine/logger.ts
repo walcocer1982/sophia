@@ -1,6 +1,7 @@
 import type { SessionState } from '@/session/state';
 import type { EscalationResponse } from './eval-escalation';
 import type { AdaptCommand } from './planner';
+import { getCollection } from '@/lib/mongo';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -15,10 +16,14 @@ export type LogEvent = {
 class EngineLogger {
   private logs: LogEvent[] = [];
   private debugMode: boolean;
+  private logToMongo: boolean;
+  private collectionName: string;
 
   constructor() {
     this.debugMode = process.env.ENGINE_DEBUG === 'true' || 
                     process.env.NEXT_PUBLIC_ENGINE_DEBUG === 'true';
+    this.logToMongo = (process.env.LOG_STORE || '').toLowerCase() === 'mongo';
+    this.collectionName = process.env.LOG_COLLECTION || 'engine_logs';
   }
 
   private log(level: LogLevel, event: string, data: Record<string, any> = {}, sessionId?: string) {
@@ -36,6 +41,40 @@ class EngineLogger {
     if (this.debugMode) {
       console.log(`[${level.toUpperCase()}] ${event}:`, data);
     }
+
+    // Persistir en Mongo si está habilitado
+    if (this.logToMongo) {
+      (async () => {
+        try {
+          const col = await getCollection(this.collectionName);
+          const ts = Date.parse(logEvent.timestamp) || Date.now();
+          const doc: any = {
+            ts,
+            level: logEvent.level,
+            event: logEvent.event,
+            sessionKey: logEvent.sessionId,
+            // Campos destacados para consultas rápidas
+            stepIdx: typeof logEvent.data?.stepIdx === 'number' ? logEvent.data.stepIdx : undefined,
+            momentIdx: typeof logEvent.data?.momentIdx === 'number' ? logEvent.data.momentIdx : undefined,
+            stepCode: logEvent.data?.stepCode,
+            classification: logEvent.data?.classification || logEvent.data?.result,
+            feedbackKind: logEvent.data?.feedbackKind,
+            nextAction: logEvent.data?.nextAction,
+            messageChars: logEvent.data?.messageChars,
+            followUpChars: logEvent.data?.followUpChars,
+            inputLen: logEvent.data?.userInputLen,
+            budget: logEvent.data?.budgetMetrics,
+            data: logEvent.data || {}
+          };
+          await col.insertOne(doc);
+        } catch {}
+      })();
+    }
+  }
+
+  // API genérica para emitir eventos arbitrarios
+  emit(event: string, data: Record<string, any> = {}, level: LogLevel = 'info', sessionId?: string) {
+    this.log(level, event, data, sessionId);
   }
 
   // Eventos del motor

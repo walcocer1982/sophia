@@ -95,9 +95,10 @@ export async function runDocenteLLM(ctx: DocentePromptContext): Promise<{ messag
     });
     out = ((r as any).output_text || '').trim();
     trace({ name: 'llm.ok', timestamp: Date.now(), props: { action: ctx.action, chars: out.length } });
-  } catch {
+  } catch (err: any) {
     offline = true;
-    trace({ name: 'llm.offline', timestamp: Date.now(), props: { action: ctx.action } });
+    try { console.error('[LLM_ERROR]', String(err?.message || err)); } catch {}
+    trace({ name: 'llm.error', timestamp: Date.now(), props: { action: ctx.action, error: String(err?.message || err) } });
   }
 
   if (!offline) {

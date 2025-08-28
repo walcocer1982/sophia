@@ -8,7 +8,7 @@ import { isGreetingInput } from '@/engine/questions';
 import { isPersonalInfoQuery, isPlatformHelpQuery, isGeneralKnowledgeStyleQuestion } from '@/engine/questions';
 import { advanceTo, currentStep, decideAction, decideNextAction, getNextAskInSameCycle, next } from '@/engine/runner';
 import { loadAndCompile } from '@/plan/compilePlan';
-import { appendHistory, clearHistory, getRecentHistory } from '@/session/history';
+import { appendHistory, clearHistory, getRecentHistory, setUserLastSession } from '@/session/history';
 import { SessionState, initSession } from '@/session/state';
 import { getSessionStore } from '@/session/store';
 import { resolveTeacherProfile } from '@/teacher/resolveProfile';
@@ -22,6 +22,8 @@ import { pickVariant, varyHintLimit } from '@/ai/ab';
 import { buildLessonRagIndex, retrieveTopKWithScores, maxSimilarity } from '@/ai/tools/RagTool';
 import { engineLogger } from '@/engine/logger';
 import { normalize } from '@/engine/eval';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/authOptions';
 
 
 // Evita repetir frases casi idénticas al componer mensajes
@@ -111,6 +113,9 @@ export async function POST(req: Request) {
 		const body = (await req.json()) as Body;
 		const { sessionKey, userInput = '', planUrl = '/courses/SSO001/lessons/lesson02.json', reset = false, clientState, adaptiveMode = false } = body;
 		let pendingInput = (userInput || '').toString();
+    // Email del usuario autenticado (si existe) para anotar ownership del historial
+    let email: string | undefined;
+    try { const sess: any = await getServerSession(authOptions as any); email = sess?.user?.email || undefined; } catch {}
 		if (reset) {
 			SESSIONS.delete(sessionKey);
 			try { await getSessionStore().delete(sessionKey); } catch {}
@@ -162,7 +167,24 @@ export async function POST(req: Request) {
       stateProfile: (state as any)?.teacherProfile
     });
     (state as any).teacherProfile = teacherProfile;
+		// Registrar inmediatamente el mensaje del estudiante (en cualquier flujo)
+		if (pendingInput && pendingInput.trim()) {
+			try {
+				await appendHistory(sessionKey, {
+					planUrl: state.planUrl,
+					stepIdx: state.stepIdx,
+					momentIdx: state.momentIdx,
+					content: pendingInput,
+					sender: 'student',
+					email
+				});
+				if (email) { try { await setUserLastSession(email, sessionKey); } catch {} }
+			} catch {}
+		}
+
 		const step = currentStep(state);
+		// Emit inicio de turno y log de arranque
+		try { engineLogger.engineTurnStart(sessionKey, state.stepIdx, String(step?.type || '')); } catch {}
 		// Debug inicio de turno
 		try {
 			const debugOn = process.env.ENGINE_DEBUG === 'true' || process.env.NEXT_PUBLIC_ENGINE_DEBUG === 'true' || Boolean((coursePolicies as any)?.debug?.logs);
@@ -472,6 +494,20 @@ export async function POST(req: Request) {
 				break;
 			}
         if (act.kind === 'ask') {
+            // Registrar mensaje del estudiante si hay entrada
+            if (pendingInput && pendingInput.trim()) {
+              try {
+                await appendHistory(sessionKey, {
+                  planUrl: state.planUrl,
+                  stepIdx: state.stepIdx,
+                  momentIdx: state.momentIdx,
+                  content: pendingInput,
+                  sender: 'student',
+                  email
+                });
+                if (email) { try { await setUserLastSession(email, sessionKey); } catch {} }
+              } catch {}
+            }
 				const q = act.step.data.question || '';
 				const acceptable = act.step.data.acceptable_answers || [];
 				// Política por tipo con K dinámico para LISTADO
@@ -1267,14 +1303,15 @@ export async function POST(req: Request) {
 				message = q2 || message || '';
 			}
 		}
-		// Persist history (JSONL estilo MongoDB-like)
+		// Persist history (JSONL/Mongo) - bot (AI)
 		try {
 			await appendHistory(sessionKey, {
 				planUrl: state.planUrl,
 				stepIdx: state.stepIdx,
 				momentIdx: state.momentIdx,
 				message,
-				followUp
+				followUp,
+				sender: 'ai'
 			});
 		} catch {}
 
@@ -1315,6 +1352,21 @@ export async function POST(req: Request) {
 			escalationsUsed: state.escalationsUsed || 0,
 			adaptiveMode: state.adaptiveMode || false
 		} : null;
+		// Log estructurado del turno en engine_logs (si LOG_STORE=mongo)
+		try {
+			engineLogger.emit('engine.turn', {
+				stepIdx: state.stepIdx,
+				stepCode: (currentStep(state) as any)?.code || dbg?.stepCode,
+				classification: dbg?.kind,
+				feedbackKind: dbg?.feedbackKind || dbg?.kind,
+				nextAction: dbg?.nextAction,
+				messageChars: (message || '').length,
+				followUpChars: (followUp || '').length,
+				userInputLen: (pendingInput || '').length,
+				momentIdx: state.momentIdx,
+				budgetMetrics
+			}, 'info', sessionKey);
+		} catch {}
 
 		// Enriquecer con hints usados para el paso actual y máximo desde políticas
 		let hintsUsedOut = 0;
